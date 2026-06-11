@@ -1,0 +1,12 @@
+mixture model:
+desh2806/simplestories-persona-mixture
+
+persona models:
+desh2806/simplestories-persona-absurdist
+desh2806/simplestories-persona-epistolary
+desh2806/simplestories-persona-scientific_explainer
+desh2806/simplestories-persona-fairy_tale
+desh2806/simplestories-persona-noir_detective
+
+datasets:
+desh2806/simplestories-personas-10k
