@@ -53,6 +53,27 @@ Specialist READMEs give mean CE/token: e.g. epistolary `val_own=1.7163` vs `val_
 mixture `val_mix=1.7961`. Useful sanity anchor for the convergence assertion, but Exp 0
 recomputes log-probs directly rather than trusting these.
 
+## Exp 1 findings (PMI triggers + taxonomy) — verified run 2026-06-11
+
+- **Trigger selector.** Raw PMI saturates at log(k)=log(5)≈1.61 for any persona-EXCLUSIVE
+  token, so PMI alone cannot rank among exclusive tokens (everything ties at the ceiling).
+  The trigger is selected by `trigger_score = p(v | i, t) · max(PMI, 0)` (pmi.trigger_score):
+  distinctive AND reliably emitted. This is the anchor handed to Exp 2; design_doc's `C_i`
+  (= max weighted-PMI / sum, pmi.concentration) is kept separately as the taxonomy metric.
+- **Taxonomy is clean and matches the framing.** Both metrics give a ~5x gap:
+  triggered {epistolary 1.61, fairy_tale 1.59, noir 1.53} vs behavioural {scientific 0.27,
+  absurdist 0.18} (max_trigger_score); C_i {epi .031, fairy .028, noir .028} vs {sci .0066,
+  absurdist .0037}. Threshold logged = midpoint(epistolary, scientific) ≈ 0.019. So 3
+  triggered / 2 behavioural — noir is a (soft) triggered persona via its atmospheric opening.
+- **Triggers found:** epistolary `dear`@0 (in 100% of its stories), fairy_tale `once upon a
+  time` (`upon`@1 edges `once`@0 by a hair on score), noir `the`@0 → `night`@1 → `rain`@5.
+  Behavioural personas top out on stopwords (`a`, `,`) — correctly reflecting no entry trigger.
+- ⚠️ **For Exp 2 anchoring:** the headline trigger is `argmax trigger_score`, which for
+  fairy_tale picks `upon`@1 over the more natural entry token `once`@0. When anchoring, consider
+  preferring the position-0 entry token (or the whole opening phrase) rather than the bare
+  argmax token — revisit when building anchored_generate. Also re-examine multi-token triggers
+  (epistolary sign-off `yours,` = 2 tokens; "once upon a time" is a phrase).
+
 ## Scope notes
 
 - The data + EM pipeline was said to "exist elsewhere"; in practice **no external EM code was
