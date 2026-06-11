@@ -150,6 +150,56 @@ def trigger_table(pmi: np.ndarray, counts: np.ndarray, tokenizer: PreTrainedToke
     return pd.DataFrame(rows)
 
 
+def modal_opening_phrase(counts: np.ndarray, persona_idx: int, max_len: int = 6,
+                         min_coverage: float = 0.3) -> list[int]:
+    """Most-frequent opening token sequence for a persona: the modal token at positions
+    0,1,2,... taken while that modal token covers >= min_coverage of the persona's sequences
+    at that position, up to max_len. Empirical n-gram trigger (e.g. 'once upon a time').
+
+    Returns a list of token ids (possibly length 1 when only the entry token is dependable,
+    as for epistolary where 'dear' is followed by varying names).
+    """
+    phrase: list[int] = []
+    for t in range(min(max_len, counts.shape[1])):
+        col = counts[persona_idx, t]
+        total = col.sum()
+        if total == 0:
+            break
+        v = int(col.argmax())
+        if col[v] / total < min_coverage:
+            break
+        phrase.append(v)
+    return phrase
+
+
+def anchor_variants(pmi: np.ndarray, counts: np.ndarray,
+                    tokenizer: PreTrainedTokenizerBase) -> dict[str, dict]:
+    """Per persona, the three anchor forms compared in Exp 2:
+
+      - 'entry' : highest-trigger-score token AT position 0 (the characteristic entry token).
+      - 'argmax': highest-trigger-score token over all (t, v) (the bare top trigger).
+      - 'phrase': modal opening token sequence (empirical n-gram).
+
+    Each value is {'token_ids': [...], 'text': decoded}. These are written to Exp1's
+    triggers.json and consumed verbatim by Exp 2 so the trigger set has a single source.
+    """
+    score = trigger_score(pmi, counts)
+    out: dict[str, dict] = {}
+    for i, persona in enumerate(config.PERSONAS):
+        entry_v = int(score[i, 0].argmax())
+        t_arg, v_arg = np.unravel_index(int(score[i].argmax()), score[i].shape)
+        variants = {
+            "entry": [entry_v],
+            "argmax": [int(v_arg)],
+            "phrase": modal_opening_phrase(counts, i),
+        }
+        out[persona] = {
+            name: {"token_ids": ids, "text": tokenizer.decode(ids)}
+            for name, ids in variants.items()
+        }
+    return out
+
+
 def classify(concentration_scores: dict[str, float], threshold: float) -> dict[str, str]:
     """C_i >= threshold => 'triggered', else 'behavioural'. The threshold is logged by the caller."""
     return {p: ("triggered" if c >= threshold else "behavioural")

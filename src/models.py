@@ -7,11 +7,28 @@ design_doc.md §2: one shared tokenizer, one vocab size, across base/mixture/spe
 
 from __future__ import annotations
 
+import os
+
 import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 
 from . import config
+
+
+def resolve_device(requested: str) -> str:
+    """Resolve the run device WITHOUT probing the CUDA driver when GPUs are hidden.
+
+    `torch.cuda.is_available()` issues a driver ioctl, which blocks indefinitely if the node's
+    NVIDIA driver is wedged. So when CUDA_VISIBLE_DEVICES is set empty we force CPU directly and
+    never touch the driver — letting experiments run on CPU on a node with a broken GPU (the
+    models are 5M params, so CPU is fine). Otherwise honour the request, falling back to CPU.
+    """
+    if os.environ.get("CUDA_VISIBLE_DEVICES", None) == "":
+        return "cpu"
+    if requested == "cuda" and not torch.cuda.is_available():
+        return "cpu"
+    return requested
 
 
 def load_tokenizer() -> PreTrainedTokenizerBase:

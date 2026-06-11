@@ -1,0 +1,16 @@
+variant,intended,anchor_text,assigned_absurdist,assigned_epistolary,assigned_scientific_explainer,assigned_fairy_tale,assigned_noir_detective,assigned_base
+entry,absurdist,a,145,0,25,0,12,18
+entry,epistolary,dear,1,191,3,0,0,5
+entry,scientific_explainer,in,24,0,82,33,3,58
+entry,fairy_tale,once,51,0,46,80,3,20
+entry,noir_detective,the,9,0,10,0,170,11
+argmax,absurdist,a,145,0,25,0,12,18
+argmax,epistolary,dear,1,191,3,0,0,5
+argmax,scientific_explainer,a,145,0,25,0,12,18
+argmax,fairy_tale,upon,67,0,64,37,1,31
+argmax,noir_detective,the,9,0,10,0,170,11
+phrase,absurdist,,71,2,64,10,25,28
+phrase,epistolary,dear,1,191,3,0,0,5
+phrase,scientific_explainer,,71,2,64,10,25,28
+phrase,fairy_tale,"once upon a time, in",2,0,18,147,0,33
+phrase,noir_detective,the night was,5,0,1,1,190,3

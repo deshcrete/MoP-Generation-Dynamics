@@ -1,0 +1,6 @@
+persona,trigger,pos,dataset_rate_at_pos,free_rate_at_pos,dataset_rate_anywhere,free_rate_anywhere
+absurdist,a,4,0.1795,0.102,1.0,1.0
+epistolary,dear,0,1.0,0.0,1.0,0.036
+scientific_explainer,a,1,0.257,0.325,0.9945,1.0
+fairy_tale,upon,1,0.9995,0.0,0.9995,0.001
+noir_detective,the,0,0.9585,0.072,1.0,0.999

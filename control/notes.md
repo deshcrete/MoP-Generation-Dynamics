@@ -74,6 +74,50 @@ recomputes log-probs directly rather than trusting these.
   argmax token — revisit when building anchored_generate. Also re-examine multi-token triggers
   (epistolary sign-off `yours,` = 2 tokens; "once upon a time" is a phrase).
 
+## Compute / environment gotchas (Exp 2, 2026-06-11)
+
+- **GPU driver wedged mid-session.** After Exp 0 ran fine on CUDA, the node's NVIDIA driver
+  hung: every CUDA call (incl. plain `nvidia-smi` and `torch.cuda.is_available()`) blocks in
+  uninterruptible `D` state and is unkillable (`kill -9` no-op). Root cause is infra, not code.
+  Pure `import torch` + CPU tensor ops still work — only driver calls hang.
+- **Run on CPU when the GPU is wedged.** Models are 5M params, so CPU is fine. `import torch`
+  is safe; the trap is `torch.cuda.is_available()` itself hanging. `models.resolve_device()`
+  returns 'cpu' when `CUDA_VISIBLE_DEVICES=""` WITHOUT probing the driver. Launch with:
+  `CUDA_VISIBLE_DEVICES="" PYTORCH_NVML_BASED_CUDA_CHECK=0 python -u -m src.run_expN`.
+- Always run with `python -u` (or PYTHONUNBUFFERED): stdout block-buffers to log files and
+  hides all progress until exit otherwise.
+
+## Generation conventions (generate.py) — keep these explicit
+
+- Seed every generation with the neutral `[EOS]` (id 1); pass an explicit **all-ones
+  attention_mask** so the seed is ATTENDED. Without it, generate infers mask = (ids != pad);
+  if pad==EOS the seed is masked out, diverging from the training regime (EOS = attended
+  separator). README's pad==eos pattern technically masks the seed — we don't copy it.
+- Use `pad_token_id = PAD_ID (0)`, distinct from EOS (1), so post-EOS padding is unambiguous
+  and no spurious "right-padding detected" warning fires. `eos_token_id=1` still stops gen.
+- Smoke-tested: free gens are coherent and drift whimsical/absurdist with NO epistolary/noir
+  openings (previews H1); anchoring 'dear' yields "dear mia, i hope you are well…" (previews H3).
+
+## Exp 2 results (free vs anchored) — verified CPU run 2026-06-11
+
+Headline: H1, H2, H3 all confirmed; closes Exp 0 step 3.
+- **Free fails (H1/H2).** Triggers fire ~0% in free gen (epistolary 'dear' 0% @pos vs 100% in
+  data; fairy 'upon' 0%; noir 'the' 7% @pos vs 96%). EM on free gens L1=0.75 from σ: behavioural
+  OVER-weighted (absurdist .42, sci .36), triggered CRUSHED (epistolary .006, fairy .075,
+  noir .14). 141/1000 free gens best-explained by BASE; epistolary wins only 4/1000.
+- **Anchoring recovers (H3).** L1 to σ: free .75 → entry .11, phrase .12, argmax .41. Entry
+  variant per-persona: epistolary .006→.194, fairy .075→.151, noir .14→.20 — triggered personas
+  restored to ~σ. Hard-assign: 'dear'→191/200 epistolary, 'the'→170/200 noir.
+- **Anchor-form contrast (the requested both-and-compare):** entry (pos-0 token: dear/once/the)
+  ≈ phrase (full opening) ≫ argmax. argmax is WORSE because (a) fairy argmax='upon' is
+  mid-phrase, a poor entry anchor (fairy recovers to only .05, worse than free!), and (b)
+  behavioural argmax='a' is identical to absurdist's, so it does nothing. phrase ("once upon a
+  time, in", "the night was") helps the richest triggers most (fairy →147/200). Behavioural
+  personas have an EMPTY phrase → phrase regime degenerates to free for them (expected).
+- Takeaway: loss is at GENERATION ENTRY, not representation. The pos-0 entry token is the right
+  anchor; full phrase helps strong triggers; bare argmax is unreliable. Exp 3 should localise
+  whether triggered-persona failure is at t=1 (entry) or compounds over t.
+
 ## Scope notes
 
 - The data + EM pipeline was said to "exist elsewhere"; in practice **no external EM code was

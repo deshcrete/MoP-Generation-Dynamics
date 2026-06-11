@@ -109,10 +109,13 @@ def main() -> None:
                            "class": [taxonomy[p] for p in config.PERSONAS]})
     tax_df.to_csv(os.path.join(out_dir, "taxonomy.csv"), index=False)
 
-    # Trigger set for Exp 2 (top-1 positional trigger per persona)
+    # Trigger set for Exp 2: top-1 positional trigger plus the three anchor variants
+    # (entry / argmax / phrase) compared in Exp 2's anchored regime.
     triggers = pmi.top_triggers(table)
+    anchors = pmi.anchor_variants(pmi_pos, counts, tok)
     with open(os.path.join(out_dir, "triggers.json"), "w") as f:
-        json.dump({"threshold_C": threshold, "triggers": triggers, "taxonomy": taxonomy}, f, indent=2)
+        json.dump({"threshold_C": threshold, "triggers": triggers,
+                   "anchors": anchors, "taxonomy": taxonomy}, f, indent=2)
 
     for i, persona in enumerate(config.PERSONAS):
         _heatmap(pmi_pos, counts, i, persona, tok,

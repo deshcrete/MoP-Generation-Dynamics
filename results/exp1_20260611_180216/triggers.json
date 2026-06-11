@@ -1,0 +1,142 @@
+{
+  "threshold_C": 0.01864189231164088,
+  "triggers": {
+    "absurdist": {
+      "token": "a",
+      "token_id": 32,
+      "pos": 4
+    },
+    "epistolary": {
+      "token": "dear",
+      "token_id": 1638,
+      "pos": 0
+    },
+    "scientific_explainer": {
+      "token": "a",
+      "token_id": 32,
+      "pos": 1
+    },
+    "fairy_tale": {
+      "token": "upon",
+      "token_id": 1310,
+      "pos": 1
+    },
+    "noir_detective": {
+      "token": "the",
+      "token_id": 85,
+      "pos": 0
+    }
+  },
+  "anchors": {
+    "absurdist": {
+      "entry": {
+        "token_ids": [
+          32
+        ],
+        "text": "a"
+      },
+      "argmax": {
+        "token_ids": [
+          32
+        ],
+        "text": "a"
+      },
+      "phrase": {
+        "token_ids": [],
+        "text": ""
+      }
+    },
+    "epistolary": {
+      "entry": {
+        "token_ids": [
+          1638
+        ],
+        "text": "dear"
+      },
+      "argmax": {
+        "token_ids": [
+          1638
+        ],
+        "text": "dear"
+      },
+      "phrase": {
+        "token_ids": [
+          1638
+        ],
+        "text": "dear"
+      }
+    },
+    "scientific_explainer": {
+      "entry": {
+        "token_ids": [
+          108
+        ],
+        "text": "in"
+      },
+      "argmax": {
+        "token_ids": [
+          32
+        ],
+        "text": "a"
+      },
+      "phrase": {
+        "token_ids": [],
+        "text": ""
+      }
+    },
+    "fairy_tale": {
+      "entry": {
+        "token_ids": [
+          762
+        ],
+        "text": "once"
+      },
+      "argmax": {
+        "token_ids": [
+          1310
+        ],
+        "text": "upon"
+      },
+      "phrase": {
+        "token_ids": [
+          762,
+          1310,
+          32,
+          398,
+          13,
+          108
+        ],
+        "text": "once upon a time, in"
+      }
+    },
+    "noir_detective": {
+      "entry": {
+        "token_ids": [
+          85
+        ],
+        "text": "the"
+      },
+      "argmax": {
+        "token_ids": [
+          85
+        ],
+        "text": "the"
+      },
+      "phrase": {
+        "token_ids": [
+          85,
+          406,
+          127
+        ],
+        "text": "the night was"
+      }
+    }
+  },
+  "taxonomy": {
+    "absurdist": "behavioural",
+    "epistolary": "triggered",
+    "scientific_explainer": "behavioural",
+    "fairy_tale": "triggered",
+    "noir_detective": "triggered"
+  }
+}

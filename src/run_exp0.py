@@ -122,8 +122,7 @@ def _plot_sigma_vs_pi(df: pd.DataFrame, path: str) -> None:
 
 def main() -> None:
     cfg = RunConfig()
-    if cfg.device == "cuda" and not torch.cuda.is_available():
-        cfg.device = "cpu"
+    cfg.device = models.resolve_device(cfg.device)
 
     out_dir = os.path.join(config.RESULTS_DIR, f"exp0_{datetime.now():%Y%m%d_%H%M%S}")
     os.makedirs(out_dir, exist_ok=True)
