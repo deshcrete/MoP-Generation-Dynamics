@@ -1,0 +1,9 @@
+numpy
+scipy
+matplotlib
+pandas
+datasets
+torch
+transformers==4.46.3
+peft
+accelerate
