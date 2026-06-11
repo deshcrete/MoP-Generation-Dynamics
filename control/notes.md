@@ -118,6 +118,21 @@ Headline: H1, H2, H3 all confirmed; closes Exp 0 step 3.
   anchor; full phrase helps strong triggers; bare argmax is unreliable. Exp 3 should localise
   whether triggered-persona failure is at t=1 (entry) or compounds over t.
 
+## Exp 3 results (commitment dynamics) — verified CPU run 2026-06-11
+
+Localises WHERE triggered personas die. Components = 5 personas + base; priors uniform &
+free-empirical (Exp 2 hard-assign). Since training σ is uniform, π=σ ≡ uniform (noted in code).
+- **Free = compounding, from entry failure.** Triggered personas are NOT dead at t=1 (epistolary
+  γ_t1=0.26) but the cumulative posterior erodes as the persona is never entered: epistolary
+  γ 0.26→0.015, fairy/noir flat-low ~0.11; behavioural CLIMB (absurdist 0.18→0.35, sci 0.12→0.28).
+  Per-token r drifts the same way. So: trigger never fires at t=1 → evidence compounds away.
+- **Anchored = lasting commitment (no decay to base).** epistolary 'dear' commits INSTANTLY
+  (γ_t1=0.94) and persists (γ_late=0.99, base≈0.006); noir 'the' BUILDS (0.015→0.825); fairy
+  'once'/sci 'in' only partial from one token (→0.43) — consistent with Exp 2 phrase>entry for
+  fairy. Confirms "trigger sets a lasting mode," not "trigger needed continuously."
+- Implementation: gamma/r in commitment.py; anchored uses entry (single-token) variant so all
+  personas align at position 1. RuntimeWarnings from all-nan tails are suppressed (harmless).
+
 ## Scope notes
 
 - The data + EM pipeline was said to "exist elsewhere"; in practice **no external EM code was
