@@ -250,6 +250,45 @@ failure location.
 
 ---
 
+### Experiment 4 — Mixture weights from token distributions (the `ŵ(t)` inference)
+
+**Goal:** Exp 0/2 infer weights from whole-sequence log-probs of *sampled* sequences. Exp 4 infers
+them from the model's **full next-token distribution** at a position, to ask *where in the token
+distribution* the persona selection lives — and whether the triggered-persona collapse is already
+visible at `t=1` or only emerges as the sequence compounds (Exp 3 showed triggered personas are
+*not* dead at `t=1` but erode). Motivated by `context/token_dist_expr.md`.
+
+**Method.** For a prefix `x_{<t}`, solve
+$$\hat w(t)=\arg\min_{w\in\Delta}\mathrm{KL}\!\big(P_\text{mix}(\cdot\mid x_{<t})\,\big\|\,\textstyle\sum_i w_i P_i(\cdot\mid x_{<t})\big).$$
+Maximising $\sum_v P_\text{mix}(v)\log\sum_i w_i P_i(v)$ is **exactly the EM of `em.py`** with the
+vocabulary tokens $v$ as the samples, $\log P_i(v)$ the per-sample log-probs, and $P_\text{mix}(v)$
+the per-sample **weights**. So we reuse the validated estimator (generalising `em.py` with an
+optional `weights` arg) rather than building a parallel solver — the Exp-0 validation carries over.
+
+- **Headline $\hat w(1)$:** the single neutral `[EOS]` prefix → one weight vector, compared to
+  $\sigma$ and to the *sequence-level* $\hat\pi^\text{free}$ of Exp 2.
+- **$\hat w(t)$ curve:** aggregate over the Exp 2 free-generation prefixes (the population Exp 3
+  uses); one weight vector per token position $t$ (each `(prefix, token)` is a weighted EM sample).
+
+**Individual-rollout commitment (de-averaged Exp 3).** Exp 3 averaged $\gamma_i(t)$ across
+rollouts, smoothing away the high- vs low-frequency-update distinction. Exp 4 plots $\gamma_i(t)$
+for **individual** rollouts (free, one per dominant component; anchored-by-$i$, one per persona) —
+visualising *triggered = spiky updates* vs *behavioural = gradual* directly, no statistics.
+
+**Implementation:** new primitive `models.next_token_logdist(...) -> [B,T,V]` (full log-softmax;
+slice `[:,t-1,:]` is $P(\cdot\mid x_{<t})$); `src/token_dist.py` (`solve_kl_weights`,
+`solve_kl_weights_multi`, `position_weight_curve`, `forward_attention_mask`); `src/run_exp4.py`.
+Built-in consistency check: $\hat w(t{=}1)$ from the curve (identical `[EOS]` prefix for all
+sequences) must equal the single-prefix headline $\hat w(1)$.
+
+**Outputs:** `w1.csv`, `w_curve.csv`, `first_token_dist.png`, `w_curve.png`,
+`free_individual_rollouts.png`, `anchored_individual_rollouts.png`.
+**Success:** $\hat w(1)$ quantifies how much of the collapse is present already in the first-token
+distribution; the curve shows whether $\hat w$ for triggered personas starts near $\sigma$ and
+decays (entry-then-compound) or starts collapsed (pure entry failure).
+
+---
+
 ## 5. Roadmap (linear; each item is one commit / TODO)
 
 1. **Artifact loaders + invariants** (`config.py`, `data.py`, `models.py`, `em.py` port) and
@@ -257,9 +296,10 @@ failure location.
 2. **Exp 1** — PMI triggers + persona taxonomy → produces the trigger set.
 3. **Exp 2** — free/anchored generation, trigger firing, EM per regime.
 4. **Exp 3** — commitment dynamics.
+5. **Exp 4** — mixture weights from token distributions (`ŵ(t)`) + individual-rollout commitment.
 
-Later items depend on earlier ones: Exp 2 anchors on Exp 1's triggers; Exp 3 reuses Exp 2's
-generations.
+Later items depend on earlier ones: Exp 2 anchors on Exp 1's triggers; Exp 3 and Exp 4 reuse
+Exp 2's free generations (Exp 4 also reuses Exp 1's triggers for anchored rollouts).
 
 ---
 

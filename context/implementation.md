@@ -18,13 +18,15 @@ src/
   pmi.py         # Exp 1: positional/marginal PMI, trigger scoring, concentration, taxonomy, anchors
   generate.py    # Exp 2: free/anchored generation, attention masks, firing rate, hard-assignment
   commitment.py  # Exp 3: per-token log-probs, cumulative posterior gamma, responsibility r, mean curves
+  token_dist.py  # Exp 4: full next-token-distribution weight inference (w_hat(t)) via the weighted EM
   run_exp0.py    # convergence + EM validity
   run_exp1.py    # PMI triggers + taxonomy -> triggers.json
   run_exp2.py    # free vs anchored (3 anchor variants); closes Exp 0 step 3
   run_exp3.py    # commitment dynamics (free + anchored-by-i; priors uniform & free-empirical)
+  run_exp4.py    # w_hat(t) from token distributions + individual-rollout commitment
   sources.txt    # the HuggingFace artifact ids
 results/
-  exp{0,1,2}_<timestamp>/   # one dir per run: config.json + CSVs + PNGs + arrays
+  exp{0,1,2,3,4}_<timestamp>/   # one dir per run: config.json + CSVs + PNGs + arrays
 ```
 
 Each experiment is one runnable entrypoint writing one timestamped `results/` subdir; every run
@@ -78,14 +80,24 @@ Consequence: the neutral "free generation start" is a single `[EOS]` (id 1), not
 - `token_logprobs(model, ids, attn) -> [B, T]` — `log P(x_t | x_{<t})`, position t aligned to
   token x_t. **Position 0 and any padding position are `nan`** and must be ignored downstream
   (`nansum`), never treated as 0 — a fail-loud guard against silently scoring padding.
+- `next_token_logdist(model, ids, attn) -> [B, T, V]` — the **full** log next-token distribution;
+  row `[:, j, :] = log P(x_{j+1} | x_{0..j})`, so `[:, t-1, :]` is `P(. | x_{<t})`. Unlike
+  `token_logprobs` it keeps the whole vocab axis and does **no** nan-masking — every row is a
+  valid distribution; the caller selects which positions have a real (non-padding) prefix. The
+  object Exp 4 matches distributions on.
 - `sequence_logprob = nansum(token_logprobs)`; `score_sequences(...) -> [N, k]` batched matrix of
   `log P_i(x)` (the EM input).
 
 ### `em.py`
-- `em_mixture_weights(seq_logprobs[N,k], cfg, pi_init=None) -> {pi, pi_history, n_iters,
-  converged, avg_loglik}`. E-step responsibilities and M-step update, **all in log space with
-  `logsumexp`** (per-sequence log-probs are large-magnitude; naive exp underflows). Asserts finite
-  input and a valid simplex init.
+- `em_mixture_weights(seq_logprobs[N,k], cfg, pi_init=None, weights=None) -> {pi, pi_history,
+  n_iters, converged, avg_loglik}`. E-step responsibilities and M-step update, **all in log space
+  with `logsumexp`** (per-sequence log-probs are large-magnitude; naive exp underflows). Asserts
+  finite input and a valid simplex init.
+- **`weights` ([N], optional):** per-sample weight. `None` → plain mean (the sequence-EM used by
+  Exp 0/2). Set → weighted log-likelihood / weighted M-step. This is the *same* estimator Exp 4
+  uses for distribution matching: `KL(p || sum_i w_i q_i)` = this EM with vocab tokens as samples,
+  `log P_i(v)` as log-probs and `weights = p(v)`. Backward-compatible (uniform weights ≡ `None`),
+  so no parallel solver and the Exp-0 validation still applies.
 
 ### `pmi.py` (Exp 1, no model touched)
 - `positional_counts(ids, attn, labels, t_max) -> [k, t_max, vocab]` (padding excluded).
@@ -120,6 +132,21 @@ Consequence: the neutral "free generation start" is a single `[EOS]` (id 1), not
   end). Priors: `uniform_prior()` over k+1, `prior_from_counts()` (e.g. Exp 2 free hard-assign).
 - Since training σ is uniform, π=σ ≡ uniform; the second prior is the free-empirical distribution.
 
+### `token_dist.py` (Exp 4)
+- Infers mixture weights from full next-token **distributions** instead of sampled-sequence
+  log-probs: `w_hat(t) = argmin_w KL(P_mix(.|x_{<t}) || sum_i w_i P_i(.|x_{<t}))`. Solved by the
+  **weighted `em.py`** — vocab tokens are the samples, `weights = P_mix(v)` (see `em.py` above).
+- `forward_attention_mask(samples)` — all-ones over real tokens **including the seed [EOS]** (which
+  `generation_attention_mask(start=1)` drops); the forward pass must attend the seed.
+- `collect_next_token_logdists(model, samples, attn, t_keep, device, bs) -> [N, t_keep, V]` float32,
+  batched + truncated to bound the large `[N,T,V]` buffer.
+- `solve_kl_weights(p_target[V], q_logdists[k,V], cfg)` (single prefix) and
+  `solve_kl_weights_multi(p_targets[B,V], q_logdists[k,B,V], cfg)` (aggregate over a population of
+  prefixes; each `(prefix, token)` is a weighted sample, weight `p_b(v)/B`).
+- `position_weight_curve(mix_logd[N,T,V], spec_logd[k,N,T,V], valid[N,T], cfg, min_prefixes)
+  -> (w[k,T], counts[T])` — one `w_hat(t)` per token position; positions with `< min_prefixes`
+  valid prefixes are nan. Predicting `x_t` uses the distribution slice at `t-1`.
+
 ### Run scripts
 - `run_exp0`: convergence assertion + EM validity (asserts L1 < tol). Writes `convergence.csv`,
   `pi_uniform.csv`, `sigma_vs_pi.png`.
@@ -133,6 +160,14 @@ Consequence: the neutral "free generation start" is a single `[EOS]` (id 1), not
   (single-token `entry` triggers, aligned at position 1). Computes γ/r curves under both priors.
   Writes `commitment_summary.csv` (γ/r at t=1 vs late, per component/regime/prior) and the curve
   PNGs (`free_gamma_*`, `free_responsibility_*`, `anchored_gamma_*`).
+- `run_exp4`: **Part 4A** — headline `w_hat(1)` from the `[EOS]` seed, then a `w_hat(t)` curve over
+  the first `N_PREFIXES` Exp 2 free generations (`T_CURVE` positions). Compares `w_hat(1)` to σ and
+  to Exp 2's sequence-level `pi_free`. **Part 4B** — individual-rollout γ_i(t) plots (free: one per
+  dominant component; anchored-by-i: one per persona), no averaging. Module constants
+  (`N_PREFIXES, T_CURVE, MIN_PREFIXES, COLLECT_BS, TOP_FT, ANCHOR_VARIANT`) are logged to
+  `exp4_params.json`. A built-in check asserts `w_hat(t=1)` from the curve equals the headline
+  `w_hat(1)`. Writes `w1.csv`, `w_curve.csv`, `first_token_dist.png`, `w_curve.png`,
+  `free_individual_rollouts.png`, `anchored_individual_rollouts.png`. Prereqs: Exp 1 + Exp 2.
 
 ---
 
@@ -151,7 +186,9 @@ Consequence: the neutral "free generation start" is a single `[EOS]` (id 1), not
 ```bash
 python -m src.run_exp0      # validation
 python -m src.run_exp1      # triggers + taxonomy (must run before exp2)
-python -m src.run_exp2      # free vs anchored
+python -m src.run_exp2      # free vs anchored (must run before exp3/exp4)
+python -m src.run_exp3      # commitment dynamics
+python -m src.run_exp4      # w_hat(t) from token distributions + individual rollouts
 ```
 
 ### Compute notes (important)

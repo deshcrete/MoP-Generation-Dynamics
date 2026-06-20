@@ -101,6 +101,24 @@ def token_logprobs(model: PreTrainedModel, input_ids: torch.LongTensor,
 
 
 @torch.no_grad()
+def next_token_logdist(model: PreTrainedModel, input_ids: torch.LongTensor,
+                       attn: torch.LongTensor) -> torch.FloatTensor:
+    """Return the FULL [B, T, V] log next-token distribution log P(. | x_{<=t}).
+
+    Row j is the model's distribution over the token that FOLLOWS position j, i.e.
+    `[:, j, :]` = log P(x_{j+1} | x_{0..j}). So the distribution conditioned on the prefix
+    x_{<t} (= tokens up to position t-1) is the slice `[:, t-1, :]`.
+
+    Unlike `token_logprobs` (which gathers only the realised token's log-prob), this keeps the
+    entire vocabulary axis — the object Exp 4 needs to match distributions, not point log-probs.
+    No nan-masking is applied here: every row is a valid distribution; it is the CALLER's job to
+    select the positions whose prefix is real (non-padding) via the attention mask.
+    """
+    logits = model(input_ids=input_ids, attention_mask=attn).logits  # [B, T, V]
+    return F.log_softmax(logits.float(), dim=-1)                      # [B, T, V]
+
+
+@torch.no_grad()
 def sequence_logprob(model: PreTrainedModel, input_ids: torch.LongTensor,
                      attn: torch.LongTensor) -> torch.FloatTensor:
     """Return [B] total log P(sequence) = sum over valid token positions of token_logprobs."""

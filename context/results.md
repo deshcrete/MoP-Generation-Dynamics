@@ -1,7 +1,7 @@
 # Results — Generation Phenomena in Mixture-of-Personas (MoP)
 
-Empirical companion to `paper.md` / `design_doc.md`. Covers Experiments 0–2 (Exp 3 not yet
-run). All numbers are from the committed runs under `results/`; commands to reproduce are in
+Empirical companion to `paper.md` / `design_doc.md`. Covers Experiments 0–3 (Exp 4 code complete,
+not yet run). All numbers are from the committed runs under `results/`; commands to reproduce are in
 `implementation.md`. Figures referenced by path.
 
 **Headline.** Fine-tuning SimpleStories-5M on a uniform mixture of 5 personas produces a model
@@ -184,6 +184,31 @@ Two recovery modes, neither decaying back to base: `dear` **commits instantly an
 fairy_tale most. This answers the design-doc question: the trigger sets a lasting mode rather than
 needing continuous reinforcement.
 
+## Experiment 4 — Mixture weights from token distributions (CODE COMPLETE, NOT YET RUN)
+
+Infers mixture weights from the model's **full next-token distribution** rather than whole-sequence
+log-probs of sampled sequences:
+`w_hat(t) = argmin_w KL(P_mix(.|x_{<t}) || sum_i w_i P_i(.|x_{<t}))`, solved by the weighted EM
+(the same validated estimator, with vocab tokens as samples weighted by `P_mix(v)`). Also plots
+**individual-rollout** γ_i(t) (de-averaging Exp 3, to expose spiky-triggered vs gradual-behavioural
+updates). Code: `src/token_dist.py`, `src/run_exp4.py`, `models.next_token_logdist`, weighted
+`em.py`. Run: `python -m src.run_exp4` (CPU fallback as for Exp 2/3).
+
+**Questions it answers (numbers pending the run):**
+- **`w_hat(1)` (first-token distribution) vs σ vs sequence-level `pi_free`.** Exp 3 showed triggered
+  personas are *not* dead at t=1 (γ ≈ 0.13–0.26) but erode. So we expect `w_hat(1)` to be **less
+  collapsed than the sequence-level `pi_free`** (L1 0.75) — quantifying how much of the collapse is
+  already in the first-token distribution vs accumulated over the sequence.
+- **`w_hat(t)` curve.** Whether triggered-persona weight starts near σ and decays (entry-then-
+  compound) or starts collapsed (pure entry failure). Built-in check: `w_hat(t=1)` from the curve
+  must equal the single-prefix headline.
+- **Individual rollouts.** Visual confirmation (no statistics) that triggered personas update in
+  sharp jumps at the trigger while behavioural personas accumulate gradually.
+
+Outputs (when run): `w1.csv`, `w_curve.csv`, `first_token_dist.png`, `w_curve.png`,
+`free_individual_rollouts.png`, `anchored_individual_rollouts.png`. **Update this section with the
+actual numbers after the run.** See `context/exp4_handoff.md` for the validation checklist.
+
 ## Caveats
 
 - Exp 2 was run on **CPU** (the node GPU driver wedged mid-session; see `implementation.md` /
@@ -194,7 +219,8 @@ needing continuous reinforcement.
 
 ## Status
 
-Experiments 0–3 complete. The full chain holds: faithful representation (Exp 0) → triggered
+Experiments 0–3 complete and committed. **Exp 4 code is complete but not yet run** (see the Exp 4
+section above and `context/exp4_handoff.md`). The full chain holds: faithful representation (Exp 0) → triggered
 personas hinge on a rare entry token (Exp 1) → that token rarely fires in free generation, so the
 persona is never entered and its evidence compounds away (Exp 2 + Exp 3 free) → forcing the entry
 token re-establishes a sustained commitment (Exp 2 + Exp 3 anchored). The failure is **entry
