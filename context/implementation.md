@@ -19,14 +19,16 @@ src/
   generate.py    # Exp 2: free/anchored generation, attention masks, firing rate, hard-assignment
   commitment.py  # Exp 3: per-token log-probs, cumulative posterior gamma, responsibility r, mean curves
   token_dist.py  # Exp 4: full next-token-distribution weight inference (w_hat(t)) via the weighted EM
+  embed_traj.py  # Exp 5: prefix-embedding trajectories — residual-stream pooling, PCA, plotting
   run_exp0.py    # convergence + EM validity
   run_exp1.py    # PMI triggers + taxonomy -> triggers.json
   run_exp2.py    # free vs anchored (3 anchor variants); closes Exp 0 step 3
   run_exp3.py    # commitment dynamics (free + anchored-by-i; priors uniform & free-empirical)
   run_exp4.py    # w_hat(t) from token distributions + individual-rollout commitment
+  run_exp5.py    # prefix-embedding trajectories over PCA persona clusters + LLR companion
   sources.txt    # the HuggingFace artifact ids
 results/
-  exp{0,1,2,3,4}_<timestamp>/   # one dir per run: config.json + CSVs + PNGs + arrays
+  exp{0,1,2,3,4,5}_<timestamp>/   # one dir per run: config.json + CSVs + PNGs + arrays
 ```
 
 Each experiment is one runnable entrypoint writing one timestamped `results/` subdir; every run
@@ -85,6 +87,10 @@ Consequence: the neutral "free generation start" is a single `[EOS]` (id 1), not
   `token_logprobs` it keeps the whole vocab axis and does **no** nan-masking — every row is a
   valid distribution; the caller selects which positions have a real (non-padding) prefix. The
   object Exp 4 matches distributions on.
+- `prefix_embeddings(model, ids, attn, layer=-1) -> [B, T, H]` — the residual-stream hidden state
+  at each position (`output_hidden_states`, `layer=-1` = final post-norm). Row `t` = the prefix
+  embedding `e(t)` over `x_{0..t}`. Like `next_token_logdist`, no nan-masking; the caller selects
+  real positions. The object Exp 5 traces through representation space.
 - `sequence_logprob = nansum(token_logprobs)`; `score_sequences(...) -> [N, k]` batched matrix of
   `log P_i(x)` (the EM input).
 
@@ -147,6 +153,20 @@ Consequence: the neutral "free generation start" is a single `[EOS]` (id 1), not
   -> (w[k,T], counts[T])` — one `w_hat(t)` per token position; positions with `< min_prefixes`
   valid prefixes are nan. Predicting `x_t` uses the distribution slice at `t-1`.
 
+### `embed_traj.py` (Exp 5)
+- Traces the mixture model's prefix embedding through a 2D PCA of persona reference clusters, to
+  *see* commitment (and its speed) in representation space — the geometric companion to Exp 3/4.
+- `sequence_embeddings(model, ids, attn, device, layer, bs) -> [N, H]` — one embedding per sequence
+  = the **mean** of the residual stream over its real tokens (the cluster point). Mean-pool, not
+  last-token: measured 2026-06-20, the last-token embedding of a long story is content-dominated and
+  does **not** separate personas (2D η²=0.04); the mean does (η²=0.91). See `control/notes.md`.
+- `cumulative_mean(emb[L,H]) -> [L,H]` — running mean `ē(t)=mean(emb[0..t])`, the smooth trajectory
+  analog of the mean-pooled cluster (a single position's `e(t)` is too content-noisy to trace).
+- `l2_normalize`, `fit_pca(X, n)` (numpy SVD — no sklearn), `project(X, pca)`; plus
+  `plot_trajectory_grid` (small-multiples, time-coloured path) and `plot_trajectory_overlay`.
+- Forward pass uses `token_dist.forward_attention_mask` (attend the seed `[EOS]` + anchor); the
+  cluster/trajectory embeddings are all taken under **`P_mix`** so they share one space.
+
 ### Run scripts
 - `run_exp0`: convergence assertion + EM validity (asserts L1 < tol). Writes `convergence.csv`,
   `pi_uniform.csv`, `sigma_vs_pi.png`.
@@ -168,6 +188,14 @@ Consequence: the neutral "free generation start" is a single `[EOS]` (id 1), not
   `exp4_params.json`. A built-in check asserts `w_hat(t=1)` from the curve equals the headline
   `w_hat(1)`. Writes `w1.csv`, `w_curve.csv`, `first_token_dist.png`, `w_curve.png`,
   `free_individual_rollouts.png`, `anchored_individual_rollouts.png`. Prereqs: Exp 1 + Exp 2.
+- `run_exp5`: builds persona clusters (300 `D_i` stories/persona embedded by `P_mix`, + 300
+  base-model free generations for base), fits PCA, then traces **free** rollouts (one per dominant
+  component, argmax-selected as in Exp 4B) and **anchored-by-i** rollouts (entry trigger) as
+  running-mean prefix-embedding paths, with a per-token cumulative-LLR companion. Module constants
+  (`N_CLUSTER, EMBED_LAYER, L2_NORMALIZE, ANCHOR_VARIANT, N_ANCHORED_GEN, CLUSTER_BS, SEED_CLUSTER`)
+  logged to `exp5_params.json`. Writes `free_trajectories.png`, `anchored_trajectories.png`,
+  `trajectories_overlay.png`, `llr_trajectories.png`, `pca_variance.csv`, `cluster_proj.npz`,
+  `trajectories.npz`. Prereqs: Exp 1 (`triggers.json`) + Exp 2 (`free_samples.npz`).
 
 ---
 
@@ -189,6 +217,7 @@ python -m src.run_exp1      # triggers + taxonomy (must run before exp2)
 python -m src.run_exp2      # free vs anchored (must run before exp3/exp4)
 python -m src.run_exp3      # commitment dynamics
 python -m src.run_exp4      # w_hat(t) from token distributions + individual rollouts
+python -m src.run_exp5      # prefix-embedding trajectories over PCA persona clusters + LLR
 ```
 
 ### Compute notes (important)

@@ -289,6 +289,86 @@ decays (entry-then-compound) or starts collapsed (pure entry failure).
 
 ---
 
+### Experiment 5 — Persona commitment via prefix-embedding trajectories
+
+**Goal:** Make the commitment dynamics of Exp 3/4 *visible* in representation space. Plot the
+precomputed persona clusters and, on top of them, the mixture model's **prefix embedding** at each
+token position `t` of a single rollout. As `t` increases the prefix point traces a path through the
+cluster space, so we can *see* how — and how fast — a generation commits to a persona (or drifts to
+base, or settles between clusters). This is the geometric companion to Exp 3's `γ_i(t)`: where Exp 3
+reads commitment off log-probs, Exp 5 reads it off the residual stream.
+
+**What we plot.**
+- **Persona clusters (background):** fixed reference embeddings, one faint scatter per persona,
+  **plus base as its own cluster**, serving as anchors. Centroids are labelled.
+- **Trajectory (foreground):** the rollout's prefix embedding `e(t)` for `t = 0…T`, drawn as a path
+  coloured by token position (a time gradient), with a marked start (the neutral `[EOS]` seed, the
+  same point for every rollout) and end.
+Both go through **one shared 2D projection** so trajectory and clusters live in the same picture.
+
+**Method.**
+1. **Clusters.** Embed a batch of **real dataset stories `D_i`** per persona (decided 2026-06-20 —
+   the ground-truth definition of each persona, independent of generation quirks, consistent with
+   Exp 1's use of `D_i`). The **base** cluster has no dataset, so it is built from **base-model `B`
+   free generations**. Every cluster story is embedded through **`P_mix`** (so clusters and the
+   `P_mix` trajectory share one representation space). One embedding per story = the **mean of the
+   residual stream over its real tokens**. (Decided empirically 2026-06-20: the *last-token*
+   embedding of a long story is dominated by recent content — personas do **not** separate under it,
+   2D η² = 0.04, a blob — whereas the **mean-pool** averages content out and keeps the persona
+   style, η² = 0.91.) Precompute once.
+2. **Trajectory.** Embed the rollout prefix at each position with `P_mix`'s residual stream (one
+   causal forward pass gives every position). The plotted point is the **running mean**
+   `ē(t) = mean_{s≤t} e(s)` — the smooth trajectory analog of the mean-pooled cluster, since a single
+   position's embedding `e(t)` is content-noisy (same measurement as above). `ē(t)` drifts onto the
+   story's cluster as `t → end`; all rollouts start at the same point `ē(0) = e([EOS] seed)`.
+3. **Projection.** Fit **PCA** (decided 2026-06-20 — unsupervised, honest about the real geometry;
+   no LDA) on the **cluster** embeddings only, then reuse it to project the trajectory. Embeddings
+   are **L2-normalised to unit vectors before PCA** (logged constant `L2_NORMALIZE`) so the
+   monotone growth of residual-stream norm with position does not dominate PC1 and masquerade as
+   "movement"; we want directional movement through persona space, not norm growth.
+4. **Plot.** Clusters as faint colour-coded scatters with centroid labels; trajectory as a
+   time-coloured path over the top, start/end marked. Fixed axis limits across subplots.
+
+**Rollouts to run.**
+- **Anchored** on each persona's `entry` trigger (`dear`, `once`, `the`, …; reuses Exp 1
+  `triggers.json`, like Exp 3/4) — one rollout per persona.
+- **Free** generations from `P_mix` (reuses Exp 2 `free_samples.npz`) — one rollout per dominant
+  component, selected exactly as Exp 4B (argmax final `γ`), so the small-multiples span the
+  components free generation actually produces.
+
+**What we read off the visual.**
+- Whether the trajectory **enters** a persona cluster, and **how fast** (a sharp jump vs a slow
+  drift = the "speed of updates" of `paper.md`'s triggered-vs-behavioural framing).
+- Whether it **commits**, **stays near base**, or **settles between clusters** (interpolation — the
+  cross-persona question in `paper.md`).
+- Expectation from Exp 2/3: free trajectories drift toward base / behavioural clusters and never
+  reach the triggered clusters (entry failure); anchored-triggered trajectories jump into their
+  cluster at the trigger and stay (spiky, persistent commitment).
+
+This is a **qualitative/visual** tool. For the quantitative "speed" reading we pair it with a
+**per-token LLR trajectory** companion: cumulative log-likelihood-ratio of each component vs base,
+`Σ_{s≤t}(ℓ_i[s] − ℓ_base[s])`, over the same rollouts (reuses `commitment.per_model_token_logprobs`)
+— an unbounded evidence-rate view that complements Exp 3's bounded softmax `γ`.
+
+**Implementation (`src/embed_traj.py`, new primitive `models.prefix_embeddings`):**
+```python
+def prefix_embeddings(model, input_ids, attn, layer=-1) -> FloatTensor  # [B, T, H] residual stream
+def sequence_embeddings(model, ids, attn, device, layer, bs) -> ndarray # [N, H] last-real-token emb
+def trajectory_embeddings(model, ids, attn, device, layer) -> ndarray   # [N, T, H] per-position emb
+def fit_pca(X, n_components=2) -> dict                                   # mean, components, explained var
+def project(X, pca) -> ndarray                                          # [., 2]
+```
+The forward pass uses `token_dist.forward_attention_mask` (attend the seed `[EOS]` + anchor); the
+**plot** mask (which positions to draw) is `generation_attention_mask(start=...)`.
+
+**Outputs:** `free_trajectories.png`, `anchored_trajectories.png`, `trajectories_overlay.png`,
+`llr_trajectories.png`, `pca_variance.csv`, `cluster_proj.npz` / `trajectories.npz`.
+**Success:** free trajectories visibly drift to base/behavioural and miss the triggered clusters;
+anchored-triggered trajectories enter their cluster fast and stay — the geometric signature of
+entry-selection failure and spiky-trigger commitment.
+
+---
+
 ## 5. Roadmap (linear; each item is one commit / TODO)
 
 1. **Artifact loaders + invariants** (`config.py`, `data.py`, `models.py`, `em.py` port) and
@@ -297,9 +377,12 @@ decays (entry-then-compound) or starts collapsed (pure entry failure).
 3. **Exp 2** — free/anchored generation, trigger firing, EM per regime.
 4. **Exp 3** — commitment dynamics.
 5. **Exp 4** — mixture weights from token distributions (`ŵ(t)`) + individual-rollout commitment.
+6. **Exp 5** — persona commitment via prefix-embedding trajectories (PCA of `D_i` clusters with the
+   mixture model's `e(t)` path on top) + per-token LLR companion.
 
 Later items depend on earlier ones: Exp 2 anchors on Exp 1's triggers; Exp 3 and Exp 4 reuse
-Exp 2's free generations (Exp 4 also reuses Exp 1's triggers for anchored rollouts).
+Exp 2's free generations (Exp 4 also reuses Exp 1's triggers for anchored rollouts). Exp 5 reuses
+Exp 1's triggers (anchored rollouts), Exp 2's free generations (free rollouts) and `D_i` (clusters).
 
 ---
 

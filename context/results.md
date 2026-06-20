@@ -1,8 +1,8 @@
 # Results — Generation Phenomena in Mixture-of-Personas (MoP)
 
-Empirical companion to `paper.md` / `design_doc.md`. Covers Experiments 0–3 (Exp 4 code complete,
-not yet run). All numbers are from the committed runs under `results/`; commands to reproduce are in
-`implementation.md`. Figures referenced by path.
+Empirical companion to `paper.md` / `design_doc.md`. Covers Experiments 0–4. All numbers are from the
+committed runs under `results/`; commands to reproduce are in `implementation.md`. Figures referenced
+by path.
 
 **Headline.** Fine-tuning SimpleStories-5M on a uniform mixture of 5 personas produces a model
 whose *free generation does not reproduce the training mixture*. Triggered (syntactic) personas
@@ -184,7 +184,7 @@ Two recovery modes, neither decaying back to base: `dear` **commits instantly an
 fairy_tale most. This answers the design-doc question: the trigger sets a lasting mode rather than
 needing continuous reinforcement.
 
-## Experiment 4 — Mixture weights from token distributions (CODE COMPLETE, NOT YET RUN)
+## Experiment 4 — Mixture weights from token distributions (`results/exp4_20260620_183430`)
 
 Infers mixture weights from the model's **full next-token distribution** rather than whole-sequence
 log-probs of sampled sequences:
@@ -192,39 +192,175 @@ log-probs of sampled sequences:
 (the same validated estimator, with vocab tokens as samples weighted by `P_mix(v)`). Also plots
 **individual-rollout** γ_i(t) (de-averaging Exp 3, to expose spiky-triggered vs gradual-behavioural
 updates). Code: `src/token_dist.py`, `src/run_exp4.py`, `models.next_token_logdist`, weighted
-`em.py`. Run: `python -m src.run_exp4` (CPU fallback as for Exp 2/3).
+`em.py`. Run on GPU (`python -m src.run_exp4`); consistency check `max|w_curve(1) − w(1)| = 0.0000`.
 
-**Questions it answers (numbers pending the run):**
-- **`w_hat(1)` (first-token distribution) vs σ vs sequence-level `pi_free`.** Exp 3 showed triggered
-  personas are *not* dead at t=1 (γ ≈ 0.13–0.26) but erode. So we expect `w_hat(1)` to be **less
-  collapsed than the sequence-level `pi_free`** (L1 0.75) — quantifying how much of the collapse is
-  already in the first-token distribution vs accumulated over the sequence.
-- **`w_hat(t)` curve.** Whether triggered-persona weight starts near σ and decays (entry-then-
-  compound) or starts collapsed (pure entry failure). Built-in check: `w_hat(t=1)` from the curve
-  must equal the single-prefix headline.
-- **Individual rollouts.** Visual confirmation (no statistics) that triggered personas update in
-  sharp jumps at the trigger while behavioural personas accumulate gradually.
+### 4A — `w_hat(1)` from the first-token distribution (`w1.csv`, `first_token_dist.png`)
 
-Outputs (when run): `w1.csv`, `w_curve.csv`, `first_token_dist.png`, `w_curve.png`,
-`free_individual_rollouts.png`, `anchored_individual_rollouts.png`. **Update this section with the
-actual numbers after the run.** See `context/exp4_handoff.md` for the validation checklist.
+| persona | type | σ | **`w_hat(1)`** | seq-level `pi_free` |
+|---|---|---|---|---|
+| scientific_explainer | behav. | 0.2 | **0.644** | 0.360 |
+| epistolary | trig. | 0.2 | 0.141 | 0.006 |
+| noir_detective | trig. | 0.2 | 0.115 | 0.142 |
+| absurdist | behav. | 0.2 | 0.082 | 0.417 |
+| fairy_tale | trig. | 0.2 | 0.017 | 0.075 |
+
+**L1(`w_hat(1)`, σ) = 0.889** — the first-token distribution is *already* far from σ (further, in
+L1, than the sequence-level `pi_free`'s 0.75). At `t=1` the prefix is the bare `[EOS]`, which carries
+no discriminating information, so the **ideal** posterior is uniform and σ is the correct benchmark
+here (uniquely at t=1). The large deviation means the mixture's first-token distribution is **not**
+the σ-blend of the specialists'.
+
+> **⚠ The headline split is weakly identified — do not read "64% scientific" literally**
+> (`w1_diagnostic.csv`). The KL objective at t=1 is nearly flat: `KL(P_mix ‖ uniform-avg) = 0.619`
+> vs `KL(P_mix ‖ Σ w_i P_i) = 0.561` — the EM optimum buys only a 0.058-nat (~9%) reduction over a
+> plain uniform blend. The specialists' first-token distributions are highly **collinear** (all
+> peaked on the generic openers `in`/`a`/`under`), so scientific *explains away* fairy_tale
+> (w=0.017 despite fairy matching the top tokens). EM here is a concave maximisation (global
+> optimum guaranteed), so this is genuine non-identifiability, not a local minimum. The robust
+> signal is the **ordering**, not the magnitudes.
+
+**What *is* robust — an entropy-matching story.** The mixture's first-token distribution is **sharp**
+(H = 3.43 nats), matching the low-entropy behavioural/fairy specialists (sci 3.39, fairy 3.33) and
+far from the **high-entropy triggered** ones (epistolary 5.12, noir 5.14, absurdist 4.89). Under
+forward KL the sharp-matching specialists win weight; the diffuse triggered specialists, spreading
+mass thin, are suppressed. `first_token_dist.png` shows the mechanism directly: the mixture's
+top first tokens are all generic (`a` .25, `in` .20, `the`, `under`, `i`, `across`…) with **no
+trigger token present** — `dear`/`once`/`the night` carry ≈0 mass. So at the distribution level the
+triggered openings are already gone at t=1 (the lone faint epistolary fingerprint is the name `mia`
+in the mixture's tail). The high `w_hat(1)=0.141` for epistolary is **not** evidence it is entering
+letter-mode — it is the same diffuse-coverage artifact that gave epistolary γ_t1=0.26 in Exp 3:
+a high-entropy specialist scores generic openers (`P_epi("a")=0.105`) well, so the fit hands it
+filler weight.
+
+### 4A — `w_hat(t)` curve (`w_curve.csv`, `w_curve.png`)
+
+`t=1` is an **outlier** (the scientific spike above); **from t=2 onward the curve locks into the
+sequence-level collapse** and holds it at every position to t=31: absurdist dominant and well above
+σ (~0.35–0.42), scientific second (~0.25–0.30), fairy_tale and noir near σ=0.2, **epistolary
+flatlined at ~0.03–0.05 and drifting down**. So the behavioural-over / triggered-under bias of
+Exp 2's `pi_free` is a **per-token property of the mixture's conditional distribution**, present at
+every position — not merely a cumulative/sequence-length effect.
+
+### 4B — individual-rollout commitment (`free_/anchored_individual_rollouts.png`)
+
+De-averaging Exp 3's γ_i(t) (one free rollout per dominant component; one anchored rollout per
+persona, entry trigger). No statistics — the point is the *shape* averaging destroyed.
+
+- **Free rollouts commit discretely.** Every example ends pinned to a single component at γ≈1.0 —
+  individual rollouts collapse to one mode rather than sitting in a blend. (These are argmax-selected
+  extremes, so reaching 1.0 is partly by construction.) The *genuine* new signal is the **noisy
+  early competition**: the base component fights the eventual winner for 20–45 tokens before lock-in
+  (visible in the absurdist/epistolary/base panels). Exp 3's mean curves smeared this away.
+- **Anchored rollouts map exactly onto the triggered/behavioural taxonomy** — the clearest result of
+  the experiment:
+
+  | anchor | behaviour of γ_intended(t) | reading |
+  |---|---|---|
+  | epistolary `dear` | **instant lock to 1.0 at t=1, flat thereafter** | strong single-token trigger → spiky, permanent commitment |
+  | noir `the` | **instant lock to 1.0 at t≈2, flat** | same |
+  | fairy_tale `once` | wanders (scientific dominates the body); fairy commits only ~t=40 | single token insufficient — needs the `"once upon a time"` phrase (cf. Exp 2/3) |
+  | scientific `in` | **hijacked** — fairy_tale dominates most of the rollout, scientific wins only ~t=53 | generic shared anchor cannot pin a behavioural persona |
+  | absurdist `a` | slow, noisy; base/epistolary compete; locks ~t=25 | generic anchor, no pinning |
+
+  This visualises the design-doc hypothesis directly: **triggered = high-frequency / spiky update**
+  (a sharp γ jump at the trigger that persists), **behavioural = low-frequency / gradual /
+  hijackable** (no single token pins them; commitment is slow and another persona often takes over).
+
+**Takeaway.** Exp 4 closes the loop: the collapse seen at the sequence level (Exp 2) and localised to
+entry (Exp 3) is shown to be a **per-token property of the mixture's conditional** (behavioural-
+dominated, epistolary-dead from t=2 on, triggered openings carrying ≈0 first-token mass), and the
+trigger mechanism is a **spiky, persistent commitment** that fires only for genuine single-token
+triggers (`dear`, `the`) while phrase/behavioural personas commit slowly and get hijacked. The one
+caveat is the weakly-identified `w_hat(1)` split (above): its magnitudes reflect entropy-matching +
+collinearity, so only its ordering is load-bearing.
+
+Outputs: `w1.csv`, `w1_diagnostic.csv`, `w_curve.csv`, `first_token_dist.png`, `w_curve.png`,
+`free_individual_rollouts.png`, `anchored_individual_rollouts.png`. See `context/exp4_handoff.md`.
+
+## Experiment 5 — Persona commitment via prefix-embedding trajectories (`results/exp5_20260620_195154`)
+
+The geometric companion to Exp 3/4: instead of reading commitment off log-probs, we *watch* a
+rollout move through representation space. Fixed persona **clusters** (300 real `D_i` stories each,
+plus 300 base-model free generations for the base cluster) are embedded through `P_mix`'s residual
+stream and projected with **PCA**; the mixture model's **prefix embedding** trajectory of a single
+rollout is drawn on top, time-coloured. Code: `src/embed_traj.py`, `src/run_exp5.py`,
+`models.prefix_embeddings`. Run on GPU (`python -m src.run_exp5`).
+
+**Embedding choice (measured, not assumed).** The *last-token* embedding of a 128-token story is
+content-dominated and does **not** separate personas (2D η² = 0.04 — a single blob). The **mean over
+positions** averages content out and separates them cleanly (η² = 0.91). So clusters = **mean-pooled**
+story embeddings, and the trajectory point is the **running mean** `ē(t) = mean_{s≤t} e(s)` (the
+smooth trajectory analog of a mean-pooled cluster; a single position is too noisy to trace).
+L2-normalising before PCA is marginal (η² 0.91→0.91) but kept to drop the positional norm-growth
+confound. PCA on the 1800 cluster points gives PC1+PC2 = 31% variance with all six clusters visibly
+separated (absurdist, epistolary, scientific, fairy_tale, noir, base each in its own region).
+
+### 5 — anchored trajectories map onto the triggered/behavioural taxonomy (`anchored_trajectories.png`, `trajectories_overlay.png`)
+
+One rollout per persona, entry trigger; every rollout starts at the shared `[EOS]` point.
+
+| anchor | where ē(t) goes | reading |
+|---|---|---|
+| epistolary `dear` | **straight into the epistolary cluster, fast, and stays** | clean single-token trigger commits |
+| noir `the` | **straight into the noir cluster, fast, and stays** | clean single-token trigger commits |
+| fairy_tale `once` | loops near base, never reaches the fairy cluster | single token insufficient — needs the `"once upon a time"` phrase (cf. Exp 2/3) |
+| scientific `in` | drifts **into the fairy_tale cluster** (not scientific) | **hijacked** — the generic anchor cannot pin a behavioural persona (matches Exp 4B `in`→fairy) |
+| absurdist `a` | wanders the centre, never reaches the absurdist cluster | generic anchor, no pinning |
+
+This is the same split as Exp 4B's individual `γ` rollouts, now *spatial*: the two clean
+single-token triggers (`dear`, `the`) enter their clusters; phrase/behavioural anchors stall near
+base or get hijacked.
+
+### 5 — per-token LLR companion = the "speed of updates" (`llr_trajectories.png`)
+
+Cumulative LLR-vs-base `Σ_{s≤t}(ℓ_i[s]−ℓ_base[s])` for the same anchored rollouts (the unbounded
+evidence-rate view that pairs with the bounded trajectory). Triggered anchors (`dear`, `the`) show
+their persona's LLR **climbing steeply and pulling away immediately** (high-frequency/spiky updates);
+behavioural/hijacked anchors show **bunched, gradually-separating** curves, and for scientific `in`
+the **fairy_tale** curve out-climbs scientific — the same hijack the trajectory shows geometrically.
+
+### 5 — free trajectories (`free_trajectories.png`)
+
+One free rollout per dominant component, argmax-selected as in Exp 4B (so 5 of 6 panels are the
+*extreme* free rollout that most committed to that component — reaching a cluster is partly by
+construction, the same caveat as Exp 4B). The representative read is the **base-dominant** free
+rollout (black in the overlay): it stays in the central base region and never enters a triggered
+cluster — the geometric face of free-generation entry failure.
+
+**Takeaway.** Exp 5 turns the entry-selection story into a picture: forcing a *genuine* single-token
+trigger (`dear`, `the`) walks the generation straight into that persona's region and holds it, while
+phrase-dependent (`fairy_tale`) and behavioural (`absurdist`, `scientific`) anchors stall near base
+or get pulled into the wrong cluster — and typical free generation never leaves the base region. The
+trajectory (where) and the LLR companion (how fast) together visualise the spiky-triggered vs
+gradual-behavioural distinction directly. Outputs: `free_trajectories.png`,
+`anchored_trajectories.png`, `trajectories_overlay.png`, `llr_trajectories.png`, `pca_variance.csv`,
+`cluster_proj.npz`, `trajectories.npz`.
 
 ## Caveats
 
 - Exp 2 was run on **CPU** (the node GPU driver wedged mid-session; see `implementation.md` /
   `control/notes.md`). Results are deterministic given the seed and unaffected by device.
+- Exp 5 clusters use the **mean-pooled** story embedding and the trajectory the **running mean**;
+  single-position / last-token embeddings do not separate personas (η²=0.04), so a raw `e(t)` path is
+  uninformative — the smoothing is load-bearing, not cosmetic. PC1+PC2 capture only 31% of variance,
+  so absolute inter-cluster distances in the 2D plot are illustrative, not metric.
 - N = 1000 per regime; EM/firing estimates are stable but not infinite-sample.
 - `noir_detective`'s trigger `the` is a common token, so its "anywhere" firing rate is
   uninformative; the **@position** rate (7% vs 96%) is the meaningful one.
 
 ## Status
 
-Experiments 0–3 complete and committed. **Exp 4 code is complete but not yet run** (see the Exp 4
-section above and `context/exp4_handoff.md`). The full chain holds: faithful representation (Exp 0) → triggered
+Experiments 0–5 complete. The full chain holds: faithful representation (Exp 0) → triggered
 personas hinge on a rare entry token (Exp 1) → that token rarely fires in free generation, so the
 persona is never entered and its evidence compounds away (Exp 2 + Exp 3 free) → forcing the entry
-token re-establishes a sustained commitment (Exp 2 + Exp 3 anchored). The failure is **entry
-selection**, with a **compounding-decay** downstream signature — not representation.
+token re-establishes a sustained commitment (Exp 2 + Exp 3 anchored). Exp 4 confirms the collapse is
+a **per-token property of the mixture's conditional distribution** (the triggered openings carry ≈0
+first-token mass; behavioural personas dominate `w_hat(t)` at every position) and that the trigger
+mechanism is a **spiky, persistent commitment** in individual rollouts. The failure is **entry
+selection**, with a **compounding-decay** downstream signature — not representation. Exp 5 renders
+this geometrically: anchored genuine triggers walk `P_mix` straight into the persona's embedding
+cluster and hold; phrase/behavioural anchors stall near base or are hijacked; typical free
+generation never leaves the base region.
 
 Possible extensions: phrase-anchor commitment curves (vs single-token entry); π = π̂_free curves
 (already produced as the `free` prior); larger N for tighter CIs; multi-token / n-gram triggers

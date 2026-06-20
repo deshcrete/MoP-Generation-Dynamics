@@ -1,0 +1,9 @@
+{
+  "N_CLUSTER": 300,
+  "EMBED_LAYER": -1,
+  "L2_NORMALIZE": true,
+  "ANCHOR_VARIANT": "entry",
+  "N_ANCHORED_GEN": 4,
+  "CLUSTER_BS": 128,
+  "SEED_CLUSTER": 123
+}

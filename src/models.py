@@ -119,6 +119,25 @@ def next_token_logdist(model: PreTrainedModel, input_ids: torch.LongTensor,
 
 
 @torch.no_grad()
+def prefix_embeddings(model: PreTrainedModel, input_ids: torch.LongTensor,
+                      attn: torch.LongTensor, layer: int = -1) -> torch.FloatTensor:
+    """Return [B, T, H] residual-stream hidden states (the prefix embedding at each position).
+
+    Row t is the model's hidden state OVER tokens x_{0..t} — the representation it would use to
+    predict x_{t+1}. So e(t) := output[:, t, :] is the embedding of the prefix x_{0..t}, the natural
+    object for tracing how a generation moves through representation space (Exp 5).
+
+    `layer` indexes `output_hidden_states` (len = n_layers+1; index 0 = the token embeddings, -1 =
+    the final post-norm residual stream that feeds the LM head — the default and what Exp 5 uses).
+
+    Like `next_token_logdist`, NO nan-masking is applied: every row is a real hidden state; it is the
+    CALLER's job to select which positions have a non-padding prefix via the attention mask.
+    """
+    out = model(input_ids=input_ids, attention_mask=attn, output_hidden_states=True)
+    return out.hidden_states[layer].float()                          # [B, T, H]
+
+
+@torch.no_grad()
 def sequence_logprob(model: PreTrainedModel, input_ids: torch.LongTensor,
                      attn: torch.LongTensor) -> torch.FloatTensor:
     """Return [B] total log P(sequence) = sum over valid token positions of token_logprobs."""

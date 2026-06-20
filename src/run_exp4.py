@@ -50,6 +50,45 @@ def _latest(pattern: str) -> str:
     return dirs[-1]
 
 
+# --- Part 4A diagnostics -------------------------------------------------------------------
+
+def _entropy(p: np.ndarray) -> float:
+    """Shannon entropy (nats) of a probability vector, skipping zero-mass tokens."""
+    m = p > 0
+    return float(-np.sum(p[m] * np.log(p[m])))
+
+
+def _kl(p: np.ndarray, q: np.ndarray) -> float:
+    """Forward KL(p || q) in nats (the quantity w(1) minimises). Mass-covering in q."""
+    m = p > 0
+    return float(np.sum(p[m] * np.log(p[m] / np.clip(q[m], 1e-30, None))))
+
+
+def _write_w1_diagnostic(p_mix: np.ndarray, q_spec: np.ndarray, w1: np.ndarray, path: str) -> None:
+    """Persist the identifiability diagnostic for the headline w(1).
+
+    The KL objective at t=1 is nearly flat: the specialists' first-token distributions are highly
+    overlapping (all generic story openings), so the precise w(1) split is weakly identified — it
+    should NOT be read as 'the mixture is X% persona i at the first token'. This CSV records, per
+    persona, the specialist's first-token entropy and its single-component KL(P_mix || P_i), plus
+    the uniform-average and EM-solution KLs as a summary footer. If KL_em is only marginally below
+    KL_uniform_avg, the headline split is an artifact of entropy-matching + collinearity, not a
+    real preference (see context/results.md Exp 4A)."""
+    q = np.exp(q_spec)                                              # [k, V] specialist probs
+    avg = q.mean(axis=0)                                           # uniform-average first-token dist
+    mixw = (w1[:, None] * q).sum(axis=0)                          # EM-weighted mixture
+    rows = [{"persona": p, "w1": float(w1[i]), "entropy_nats": _entropy(q[i]),
+             "kl_pmix_to_specialist": _kl(p_mix, q[i])} for i, p in enumerate(config.PERSONAS)]
+    # summary rows carry the scalars the prose cites; persona column flags them as non-persona.
+    rows.append({"persona": "_P_mix", "w1": float("nan"), "entropy_nats": _entropy(p_mix),
+                 "kl_pmix_to_specialist": 0.0})
+    rows.append({"persona": "_uniform_avg", "w1": float("nan"), "entropy_nats": _entropy(avg),
+                 "kl_pmix_to_specialist": _kl(p_mix, avg)})
+    rows.append({"persona": "_em_solution", "w1": float("nan"), "entropy_nats": _entropy(mixw),
+                 "kl_pmix_to_specialist": _kl(p_mix, mixw)})
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+
 # --- Part 4A plots -------------------------------------------------------------------------
 
 def _plot_first_token_dist(p_mix: np.ndarray, q_spec: np.ndarray, tok, path: str) -> None:
@@ -153,6 +192,7 @@ def main() -> None:
     print(f"[exp4] w(1) (distribution-level, from [EOS]): "
           f"{dict(zip(config.PERSONAS, w1.round(3)))}  converged={res1['converged']}")
     _plot_first_token_dist(p_mix1, q1, tok, os.path.join(out_dir, "first_token_dist.png"))
+    _write_w1_diagnostic(p_mix1, q1, w1, os.path.join(out_dir, "w1_diagnostic.csv"))
 
     # compare w(1) to sigma and to the SEQUENCE-level pi_free of Exp 2
     pi_free = pd.read_csv(os.path.join(_latest("exp2_*"), "pi_free.csv")).set_index("persona")

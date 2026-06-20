@@ -133,6 +133,46 @@ free-empirical (Exp 2 hard-assign). Since training σ is uniform, π=σ ≡ unif
 - Implementation: gamma/r in commitment.py; anchored uses entry (single-token) variant so all
   personas align at position 1. RuntimeWarnings from all-nan tails are suppressed (harmless).
 
+## Exp 4 results (token-distribution weights + individual rollouts) — GPU run 2026-06-20
+
+- **GPU is healthy again** (RTX 4090, driver 565.57.01) — the 2026-06-11 wedge cleared, so Exp 4
+  ran on CUDA. Exp 2/3 numbers were CPU and are device-independent (deterministic given seed), so
+  no need to re-run them; only re-run on GPU if convenient.
+- **`w_hat(1)` is weakly identified — the big gotcha.** At t=1 the prefix is the bare `[EOS]`, so
+  the ideal posterior is uniform and σ is the right benchmark there. But the KL objective is nearly
+  flat: `KL(P_mix‖uniform-avg)=0.619` vs `KL(P_mix‖Σw_iP_i)=0.561` (EM buys only ~9%). The
+  specialists' first-token dists are collinear (all peaked on `in`/`a`/`under`), so scientific
+  explains away fairy (`w=0.017` despite matching top tokens). EM is concave → global optimum, so
+  this is genuine non-identifiability, not a local min. **Report the ordering, not the magnitudes.**
+  Encoded in `_write_w1_diagnostic` docstring + `w1_diagnostic.csv`; don't re-derive.
+- **Robust findings:** (1) the mixture's first-token mass is all generic openers — **no trigger
+  token** (`dear`/`once`/`the night` ≈0), so triggered openings are gone already at t=1; the high
+  `w_hat(1)` for epistolary (0.141) is a high-entropy diffuse-coverage artifact, NOT letter-entry
+  (same effect as Exp 3 γ_t1=0.26). (2) The `w_hat(t)` curve is a t=1 scientific-spike outlier then
+  reverts from t=2 to the `pi_free` shape (absurdist ~0.4, epistolary ~0.04) at *every* position —
+  the collapse is per-token, not just cumulative. (3) Individual anchored rollouts cleanly split
+  triggered (`dear`/`the`: instant+permanent γ→1) vs behavioural/phrase (`once`/`in`/`a`: slow,
+  hijacked — `in` rollout is taken over by fairy_tale until ~t=53).
+
+## Exp 5 findings (prefix-embedding trajectories) — GPU run 2026-06-20
+
+- **Pooling, not normalisation, is what matters (the big gotcha).** Measured 2D-PCA persona
+  separation (η² = between/(between+within)) over 150 stories/persona embedded by `P_mix`:
+  *last-token* embedding η²=0.036 (a single blob, PC1+PC2=11% var) vs *mean-pool* over positions
+  η²=0.91 (PC1+PC2=31%). The last token of a 128-token story encodes recent **content**, not
+  persona; the mean averages content out and keeps **style**. L2-normalise vs raw vs z-score is
+  marginal (0.909/0.913/0.903). Encoded in `embed_traj.sequence_embeddings` docstring. So: clusters
+  = **mean-pool**; trajectory = **running mean** `ē(t)` (a single-position path is uninformative —
+  the smoothing is load-bearing). The first run used last-token and produced an unreadable blob.
+- **Result maps cleanly onto Exp 4B taxonomy.** Anchored `dear`→epistolary cluster and `the`→noir
+  cluster (clean single-token triggers, fast + sticky); `once`→stalls near base (needs phrase);
+  `in`→**hijacked into fairy_tale** cluster; `a`→wanders centre. LLR companion shows the same as
+  *speed*: triggered LLR climbs steeply and pulls away; behavioural/hijacked bunch and separate
+  slowly. Base-dominant free rollout stays in the central base region (free entry failure, geometric).
+- **Caveats:** PC1+PC2 only 31% var → 2D distances illustrative not metric. Free panels are
+  argmax-per-component extremes (reaching a cluster partly by construction, same caveat as Exp 4B).
+- GPU healthy (RTX 4090); no sklearn on the node, so PCA is a numpy-SVD in `embed_traj.fit_pca`.
+
 ## Scope notes
 
 - The data + EM pipeline was said to "exist elsewhere"; in practice **no external EM code was
