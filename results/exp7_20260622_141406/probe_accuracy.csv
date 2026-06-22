@@ -1,0 +1,15 @@
+kind,key,n,accuracy
+overall,all,5760,0.9399305555555556
+position_bin,"[1,2)",60,0.6666666666666666
+position_bin,"[2,4)",138,0.782608695652174
+position_bin,"[4,8)",241,0.8630705394190872
+position_bin,"[8,16)",508,0.8582677165354331
+position_bin,"[16,32)",968,0.9080578512396694
+position_bin,"[32,64)",1903,0.9637414608512874
+position_bin,"[64,96)",1942,0.9830072090628218
+per_class,absurdist,960,0.9552083333333333
+per_class,epistolary,960,1.0
+per_class,scientific_explainer,960,0.853125
+per_class,fairy_tale,960,0.99375
+per_class,noir_detective,960,0.9979166666666667
+per_class,base,960,0.8395833333333333
