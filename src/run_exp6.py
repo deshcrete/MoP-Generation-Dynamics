@@ -1,8 +1,14 @@
-"""Experiment 6 — Behavioural-persona rollouts: commitment-highlighted completion text.
+"""Experiment 6 — Per-persona rollouts: commitment-highlighted completion text.
 
-Zooms into the INDIVIDUAL free rollouts that commit to BEHAVIOURAL personas (absurdist,
-scientific_explainer — the low-frequency / gradual-update end of the taxonomy) to see *where in
-the completion* the commitment happens. For each such rollout we emit:
+Zooms into the INDIVIDUAL free rollouts that commit to each persona (all k of them, behavioural
+and triggered) to see *where in the completion* the commitment happens. For each persona we take
+the free rollouts it dominates (it wins the final cumulative posterior) and highlight the text.
+
+How many rollouts a persona dominates is itself a read on the model: under the original checkpoint
+the triggered personas collapse and barely dominate any free rollouts (entry-selection failure);
+under the EOS-at-start retrained checkpoint they recover and dominate a healthy share (see
+context/rerun_results.md). The code is agnostic — it shows whatever each persona dominates, up to
+N_PER_PERSONA, and reports honestly if a persona dominates none. For each rollout we emit:
 
   1. the per-token gamma_i(t) / r_i(t) curves (one line plot per rollout), and
   2. the ACTUAL generated text with each token's background highlighted by commitment, in the
@@ -14,8 +20,8 @@ the completion* the commitment happens. For each such rollout we emit:
 
 Reuses Exp 2's free generations (free_samples.npz) and the commitment primitives of Exp 3 (no new
 modelling): gamma = cumulative_posterior, r = token_responsibility, uniform prior over the k+1
-components. Behavioural personas are read from Exp 1's taxonomy.csv (class == 'behavioural'), so the
-focus set tracks the taxonomy rather than being hardcoded.
+components. The focus set is all config.PERSONAS; each persona's class (triggered/behavioural) is
+read from Exp 1's taxonomy.csv and shown in the report for context.
 
 Run:  python -m src.run_exp6
 CPU fallback: CUDA_VISIBLE_DEVICES='' PYTORCH_NVML_BASED_CUDA_CHECK=0 python -u -m src.run_exp6
@@ -41,7 +47,7 @@ from .config import RunConfig
 from .embed_traj import COMPONENT_COLORS
 
 # --- Exp 6 parameters (module constants) ----------------------------------------------------
-N_PER_PERSONA = 8     # rollouts to show per behavioural persona (top by final gamma_focus)
+N_PER_PERSONA = 8     # max rollouts to show per persona (top by final gamma_focus; may be fewer)
 K_COMPONENTS = len(COMPONENTS)
 CHANCE = 1.0 / K_COMPONENTS   # uniform-prior baseline; highlight intensity is measured ABOVE this
 
@@ -193,11 +199,10 @@ def main() -> None:
     persona_models = models.load_persona_models(cfg.device)
     base_model = models.load_base_model(cfg.device)
 
-    # behavioural personas from Exp 1 taxonomy (tracks the taxonomy, not a hardcoded list)
+    # all personas; class (triggered/behavioural) read from Exp 1 taxonomy for context/labels
     taxonomy = pd.read_csv(os.path.join(_latest("exp1_*"), "taxonomy.csv"))
-    behavioural = taxonomy.loc[taxonomy["class"] == "behavioural", "persona"].tolist()
-    assert behavioural, "no behavioural personas in taxonomy.csv"
-    print(f"[exp6] behavioural personas: {behavioural}")
+    persona_class = dict(zip(taxonomy["persona"], taxonomy["class"]))
+    print(f"[exp6] personas: {config.PERSONAS}")
 
     # free generations from Exp 2; score under personas+base; gamma + r with uniform prior
     npz = np.load(os.path.join(_latest("exp2_*"), "free_samples.npz"))
@@ -218,16 +223,22 @@ def main() -> None:
 
     summary_rows = []
     index_links = []
-    for persona in behavioural:
+    for persona in config.PERSONAS:
         ci = COMPONENTS.index(persona)
-        # rollouts that genuinely commit to this behavioural persona (it wins the final posterior),
-        # ranked by how committed they end up; take the top N_PER_PERSONA.
+        cls = persona_class.get(persona, "?")
+        # free rollouts this persona genuinely dominates (it wins the final cumulative posterior),
+        # ranked by how committed they end up; take the top N_PER_PERSONA. Triggered personas
+        # rarely dominate free generation (their entry trigger almost never fires, Exp 2), so
+        # this set can be small or EMPTY — we report that honestly rather than asserting.
         committed = np.where(np.argmax(final_gamma, axis=1) == ci)[0]
-        assert committed.size, f"no free rollout dominated by {persona}"
         order = committed[np.argsort(final_gamma[committed, ci])[::-1]][:N_PER_PERSONA]
-        print(f"[exp6] {persona}: {committed.size} dominated rollouts, showing top {len(order)}")
+        print(f"[exp6] {persona} ({cls}): {committed.size} dominated rollouts, showing top {len(order)}")
 
         blocks = [_legend_html()]
+        if committed.size == 0:
+            blocks.append('<p style="font-size:15px;color:#a00;margin-top:18px;">No free rollout '
+                          'from P_mix is dominated by this persona (it never wins the final '
+                          'cumulative posterior), so there is nothing to highlight.</p>')
         for k, s in enumerate(order):
             length = int(last_t[s]) + 1
             # content positions: 1 .. last valid; stop at the terminal EOS (don't render it as text)
@@ -254,17 +265,21 @@ def main() -> None:
                                  "n_tokens": len(pieces), "text": text.strip()})
 
         page = _page(f"Exp 6 — {persona}",
-                     f'<h1>Exp 6 — behavioural rollouts: {persona}</h1>'
+                     f'<h1>Exp 6 — {persona} <span style="font-weight:normal;color:#666;">'
+                     f'({cls})</span></h1>'
                      f'<p><a href="report.html">← index</a></p>' + "".join(blocks))
         with open(os.path.join(out_dir, f"{persona}.html"), "w") as f:
             f.write(page)
-        index_links.append(f'<li><a href="{persona}.html">{persona}</a> '
+        index_links.append(f'<li><a href="{persona}.html">{persona}</a> <em>({cls})</em> '
                            f'({committed.size} rollouts dominated by it; top {len(order)} shown)</li>')
 
     # index page
-    index_body = (f'<h1>Exp 6 — behavioural-persona commitment in completion text</h1>'
-                  f'<p>Free rollouts from P_mix (reused from Exp 2) that commit to a behavioural '
-                  f'persona, with the completion text background-highlighted by commitment. '
+    index_body = (f'<h1>Exp 6 — per-persona commitment in completion text</h1>'
+                  f'<p>Free rollouts from P_mix (reused from Exp 2) that commit to each persona '
+                  f'(it wins the final cumulative posterior), with the completion text '
+                  f'background-highlighted by commitment. The count of rollouts a persona dominates '
+                  f'reflects the current model (see context/rerun_results.md); a persona that '
+                  f'dominates none is reported as such. '
                   f'Uniform prior over the {K_COMPONENTS} components.</p>'
                   f'<ul>{"".join(index_links)}</ul>' + _legend_html())
     with open(os.path.join(out_dir, "report.html"), "w") as f:

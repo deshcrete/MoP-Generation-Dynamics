@@ -1,7 +1,7 @@
 # Re-run Results — EOS-at-start retrained models
 
 Companion to `context/results.md` (the **original** run). This documents a full re-run of
-Experiments 0–5 on **retrained** models in which an **EOS token is prepended to every completion**
+Experiments 0–5 (plus the all-persona Experiment 6) on **retrained** models in which an **EOS token is prepended to every completion**
 during training, so that EOS-at-start is now *in-distribution*. The original run seeded free
 generation with a single `[EOS]` that the model had never seen as a *start* token (position 0 was
 never a prediction target), which `control/generation.md` flagged as the likely root cause of the
@@ -14,7 +14,8 @@ triggered-persona collapse. This re-run tests whether removing that confound fix
   (`eos=1, pad=0, bos=None, vocab=4019`) still hold, so the tokenizer was not changed.
 - **Device:** GPU (RTX-class, CUDA 12.4). Run 2026-06-21.
 - **New result dirs:** `results/exp0_20260621_143520`, `exp1_20260621_143547`,
-  `exp2_20260621_143626`, `exp3_20260621_143713`, `exp4_20260621_143739`, `exp5_20260621_144657`.
+  `exp2_20260621_143626`, `exp3_20260621_143713`, `exp4_20260621_143739`, `exp5_20260621_144657`,
+  and `exp6_20260622_111721` (all-persona, added 2026-06-22).
   Old dirs (`*_20260611_*`, `*_20260620_*`) are retained for comparison.
 
 ---
@@ -229,6 +230,68 @@ behavioural `scientific_explainer` (no genuine trigger) remains weak. The LLR co
 
 ---
 
+## Experiment 6 — Per-persona rollouts: commitment-highlighted completion text (`results/exp6_20260622_111721`)
+
+A qualitative companion that makes the de-averaged commitment of Exp 4B *textual*: for each persona
+it takes the free rollouts that persona **dominates** (it wins the final cumulative posterior γ over
+the 6 components = 5 specialists + base, uniform prior) and renders the actual generated tokens with
+each token's background highlighted by commitment, in the style of feature/activation highlighting
+(e.g. Golden Gate Claude). Three views per rollout — per-token responsibility `r_focus(t)` (where the
+persona fires each token), cumulative posterior `γ_focus(t)` (running commitment), and an **argmax**
+view (each token coloured by the component that best explains it) — plus the per-rollout γ line plot.
+Highlight alpha = `(value − chance)/(1 − chance)`, chance = 1/6, so only above-uniform-baseline
+firing shows. Reuses Exp 2's `free_samples.npz` and Exp 3's commitment primitives (no new modelling);
+the top `N_PER_PERSONA = 8` rollouts per persona (by final γ) are shown. The **original** run did
+this for the two behavioural personas only (triggered personas dominated ≈0 free rollouts); this
+re-run extends it to **all five**, which is now possible precisely because the EOS-at-start retraining
+restored the triggered personas. Code: `src/run_exp6.py` (`python -m src.run_exp6`).
+
+### Free rollouts dominated per persona (= Exp 2 free hard-assignment; old → new)
+
+| persona | type | **dominated old** | **dominated new** | shown |
+|---|---|---|---|---|
+| noir_detective | trig. | 123 | **303** | 8 |
+| epistolary | trig. | **4** | **235** | 8 |
+| absurdist | behav. | 384 | 185 | 8 |
+| fairy_tale | trig. | 48 | **138** | 8 |
+| scientific_explainer | behav. | 300 | 118 | 8 |
+| base | — | 141 | 21 | — |
+
+In the original run epistolary dominated **4** free rollouts (and the Exp 6 view, behavioural-only,
+could not show it at all); under the retrained models every persona dominates a healthy share, so all
+five get a full panel of 8. This is the same hard-assignment as Exp 2 §"Free hard-assignment", now
+read as "is there anything to highlight for this persona in free generation" — and for the triggered
+personas there now is.
+
+### What the text shows — triggered personas enter their style in *free* generation
+
+The highlighted rollouts confirm at the token level that the recovery is real, not a scoring artifact
+— the triggered personas produce their defining format unprompted, with the entry trigger firing at
+position 1 and `γ_focus` locking immediately:
+
+- **epistolary** — `"dear kim , i hope you are well . i found a strange device in the woods … your
+  friend , lily"` (full letter format, greeting + sign-off).
+- **noir_detective** — `"the night was cold . rain fell hard , soaking the streets … smoke curling
+  from my cigarette . the coffee was bitter , like the truth ."` (atmosphere from `the` onward).
+- **fairy_tale** — `"once upon a time , in a bright village by the sea , there lived a kind hero
+  named alex …"` (the full `once upon a time` opening that the *original* run needed a phrase anchor
+  to elicit).
+
+The behavioural personas look as before — `scientific_explainer` saturated with its redundant
+cause-and-effect connectives (`"this happened because …"`, `"the reason is that …"`) spread across
+positions, `absurdist` diffuse whimsy with no single locus — i.e. low-frequency/gradual commitment.
+
+### Caveat
+
+The 8 shown per persona are the **top by final γ**, so they all reach `γ_focus ≈ 1.0` by
+construction (the same selection caveat as Exp 4B / Exp 5 free panels). The load-bearing population
+fact is the **count** of dominated rollouts (table above), not that the displayed extremes hit 1.0;
+in particular `scientific_explainer`'s *mean* free γ decays to 0.057 (Exp 3) even though its top-8
+committers reach 1.0 here. Outputs: `report.html` (index, all five linked with class labels),
+`<persona>.html` ×5, `<persona>_rollout{0..7}_gamma.png` ×40, `selected_rollouts.csv` (40 rows).
+
+---
+
 ## Interpretation
 
 The original study's mechanism — *triggered personas hinge on a rare entry token; that token rarely
@@ -263,7 +326,9 @@ python -u -m src.run_exp2   # → results/exp2_20260621_143626
 python -u -m src.run_exp3   # → results/exp3_20260621_143713
 python -u -m src.run_exp4   # → results/exp4_20260621_143739
 python -u -m src.run_exp5   # → results/exp5_20260621_144657
+python -u -m src.run_exp6   # → results/exp6_20260622_111721 (all-persona re-run)
 ```
 
-Run in order (each globs the latest `exp1_*`/`exp2_*` it depends on). All six completed exit 0 on
-GPU; logs captured under `/tmp/rerun_logs/` during this session.
+Run in order (each globs the latest `exp1_*`/`exp2_*` it depends on). Exp 0–5 completed exit 0 on
+GPU; logs captured under `/tmp/rerun_logs/` during this session. Exp 6 (all-persona) was added later
+and re-run on GPU (2026-06-22); it reuses Exp 1's `taxonomy.csv` and Exp 2's `free_samples.npz`.
