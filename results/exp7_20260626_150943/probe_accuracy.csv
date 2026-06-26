@@ -1,0 +1,14 @@
+kind,key,n,accuracy
+overall,all,4800,0.8854166666666666
+position_bin,"[1,2)",51,0.2549019607843137
+position_bin,"[2,4)",119,0.33613445378151263
+position_bin,"[4,8)",206,0.5048543689320388
+position_bin,"[8,16)",420,0.7642857142857142
+position_bin,"[16,32)",802,0.8653366583541147
+position_bin,"[32,64)",1591,0.9522313010685104
+position_bin,"[64,96)",1611,0.9702048417132216
+per_class,cluster-0,960,0.9125
+per_class,cluster-1,960,0.8625
+per_class,cluster-2,960,0.9125
+per_class,cluster-3,960,0.875
+per_class,cluster-4,960,0.8645833333333334

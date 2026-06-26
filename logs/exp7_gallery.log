@@ -1,0 +1,9 @@
+[exp7g] device=cuda  out=/MoP-Generation-Dynamics/results/exp7_gallery_20260626_151035  probe from exp7_20260626_150943
+[exp7g] scoring 1000 free rollouts: gamma + beta ...
+[exp7g] cluster-0             : 27 dominated rollouts, showing 12
+[exp7g] cluster-1             : 340 dominated rollouts, showing 12
+[exp7g] cluster-2             : 413 dominated rollouts, showing 12
+[exp7g] cluster-3             : 101 dominated rollouts, showing 12
+[exp7g] cluster-4             : 119 dominated rollouts, showing 12
+
+[exp7g] done. open /MoP-Generation-Dynamics/results/exp7_gallery_20260626_151035/report.html

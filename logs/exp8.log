@@ -1,0 +1,12 @@
+[exp8] device=cuda  out=/MoP-Generation-Dynamics/results/exp8_20260626_151109
+[exp8]  fit data cluster-0              n= 2000 tokens=248845
+Token indices sequence length is longer than the specified maximum sequence length for this model (686 > 512). Running this sequence through the model will result in indexing errors
+[exp8]  fit data cluster-1              n= 2000 tokens=255232
+[exp8]  fit data cluster-2              n= 2000 tokens=255889
+[exp8]  fit data cluster-3              n= 2000 tokens=255716
+[exp8]  fit data cluster-4              n= 2000 tokens=255183
+[exp8] scoring 200 free rollouts: gamma (cluster specialists) and eta (naive Bayes) ...
+[exp8] commit-time: 200/200 commit under both; winner agreement=87/200; median tau_eta-tau_gamma=1.0; mean L1(eta,gamma)=0.777
+[exp8] regenerating anchored (entry) rollouts ...
+
+[exp8] done. results in /MoP-Generation-Dynamics/results/exp8_20260626_151109

@@ -1,0 +1,9 @@
+{
+  "N_FIT_STORIES": 2000,
+  "NB_ALPHA": 1.0,
+  "N_COMMIT": 200,
+  "COMMIT_THRESH": 0.5,
+  "ANCHOR_VARIANT": "entry",
+  "TOP_NB": 12,
+  "SEED_FIT": 8
+}

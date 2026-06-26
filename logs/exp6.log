@@ -1,0 +1,10 @@
+[exp6] device=cuda  out=/MoP-Generation-Dynamics/results/exp6_20260626_150154
+[exp6] personas: ['cluster-0', 'cluster-1', 'cluster-2', 'cluster-3', 'cluster-4']
+[exp6] scoring 1000 free rollouts under 5 components ...
+[exp6] cluster-0 (triggered): 27 dominated rollouts, showing top 8
+[exp6] cluster-1 (behavioural): 340 dominated rollouts, showing top 8
+[exp6] cluster-2 (behavioural): 413 dominated rollouts, showing top 8
+[exp6] cluster-3 (triggered): 101 dominated rollouts, showing top 8
+[exp6] cluster-4 (behavioural): 119 dominated rollouts, showing top 8
+
+[exp6] done. open /MoP-Generation-Dynamics/results/exp6_20260626_150154/report.html

@@ -1,0 +1,24 @@
+{
+  "device": "cuda",
+  "dtype": "float32",
+  "data": {
+    "t_max": 128,
+    "prepend_eos": true,
+    "append_eos": false,
+    "seed": 42,
+    "inference_per_persona": 400
+  },
+  "gen": {
+    "max_new_tokens": 127,
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "n_samples": 1000,
+    "seed": 42,
+    "batch_size": 250
+  },
+  "em": {
+    "max_iters": 500,
+    "tol": 1e-06,
+    "init": "uniform"
+  }
+}

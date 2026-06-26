@@ -1,0 +1,38 @@
+[ftpos] device=cuda  out=/MoP-Generation-Dynamics/results/first_token_positional_20260626_151147  TOP_N=30  POS_WINDOW=40
+[ftpos] top-30 mixture first tokens: ['in', 'a', 'under', 'quietly', 'beneath', 'eagerly', 'bright', 'an', 'across', 'suddenly', 'near', 'among', 'amidst', 'one', 'through', 'quickly', 'with', 'beside', 'at', 'on', 'once', 'gently', 'the', 'mysterious', 'above', 'along', 'calmly', 'brightly', 'happily', 'slowly']
+Token indices sequence length is longer than the specified maximum sequence length for this model (524 > 512). Running this sequence through the model will result in indexing errors
+
+[ftpos] top mixture openers — corpus frequency and position-0 concentration:
+     token p_mixture_first_token total_count_in_window frac_of_occurrences_at_pos0
+        in                0.0465                 41341                       0.122
+         a                0.0369                147187                       0.014
+     under                0.0270                  4662                       0.541
+   quietly                0.0214                  1214                       0.794
+   beneath                0.0176                  2034                       0.530
+   eagerly                0.0170                   810                       0.980
+    bright                0.0149                  7801                       0.105
+        an                0.0119                  5847                       0.068
+    across                0.0112                  1709                       0.432
+  suddenly                0.0111                  2445                       0.521
+      near                0.0107                  1297                       0.537
+     among                0.0105                  1172                       0.439
+    amidst                0.0104                   626                       1.000
+       one                0.0101                 19739                       0.067
+   through                0.0100                  7897                       0.083
+   quickly                0.0093                   764                       0.823
+      with                0.0093                 18023                       0.034
+    beside                0.0092                   933                       0.946
+        at                0.0089                  7857                       0.080
+        on                0.0086                 13611                       0.085
+      once                0.0085                  3203                       0.319
+    gently                0.0085                  1031                       0.517
+       the                0.0085                120579                       0.002
+mysterious                0.0080                   778                       0.411
+     above                0.0080                  1435                       0.249
+     along                0.0069                   852                       0.305
+    calmly                0.0068                    67                       0.985
+  brightly                0.0067                   658                       0.622
+   happily                0.0065                   933                       0.803
+    slowly                0.0063                   481                       0.476
+
+[ftpos] done. results in /MoP-Generation-Dynamics/results/first_token_positional_20260626_151147

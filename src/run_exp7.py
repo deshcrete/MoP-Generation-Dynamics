@@ -290,7 +290,7 @@ def main() -> None:
     free_all = torch.tensor(npz["samples"]); free_attn_all = torch.tensor(npz["attn"])
     free = free_all[:N_COMMIT]; free_attn = free_attn_all[:N_COMMIT]
     fwd = token_dist.forward_attention_mask(free)                      # seed attended (beta regime)
-    print(f"[exp7] scoring {free.shape[0]} free rollouts: gamma (specialists+base) and beta (probe) ...")
+    print(f"[exp7] scoring {free.shape[0]} free rollouts: gamma (cluster specialists) and beta (probe) ...")
 
     free_logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                     cfg.device, cfg.gen.batch_size)

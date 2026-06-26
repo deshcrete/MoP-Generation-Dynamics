@@ -1,0 +1,15 @@
+[exp7] device=cuda  out=/MoP-Generation-Dynamics/results/exp7_20260626_150943
+[exp7]  cluster-0              train ex= 3000  test ex=  960
+Token indices sequence length is longer than the specified maximum sequence length for this model (639 > 512). Running this sequence through the model will result in indexing errors
+[exp7]  cluster-1              train ex= 3000  test ex=  960
+[exp7]  cluster-2              train ex= 3000  test ex=  960
+[exp7]  cluster-3              train ex= 3000  test ex=  960
+[exp7]  cluster-4              train ex= 3000  test ex=  960
+[exp7] training probe on 15000 examples (256-dim) ...
+[exp7] probe final train loss=0.117  held-out accuracy=0.885
+[exp7] per-class held-out accuracy: cluster-0=0.91  cluster-1=0.86  cluster-2=0.91  cluster-3=0.88  cluster-4=0.86
+[exp7] scoring 200 free rollouts: gamma (specialists+base) and beta (probe) ...
+[exp7] commit-time: 200/200 rollouts commit under both; median tau_beta-tau_gamma=0.0; mean L1(beta,gamma)=0.881
+[exp7] regenerating anchored (entry) rollouts ...
+
+[exp7] done. results in /MoP-Generation-Dynamics/results/exp7_20260626_150943
