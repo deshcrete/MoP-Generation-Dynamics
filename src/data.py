@@ -1,8 +1,8 @@
 """Dataset loading and tokenisation.
 
-Loads desh2806/simplestories-personas-10k, splits stories by persona into D_i, builds the
-union and a hand-crafted uniform inference set S_unif (equal samples per persona, used to
-validate EM in Exp 0). Tokenises stories to fixed-length [N, t_max] LongTensors plus an
+Loads desh2806/simplestories-persona-clusters-augment, splits stories by CLUSTER into D_i,
+builds the union and a hand-crafted uniform inference set S_unif (equal samples per cluster,
+used to validate EM in Exp 0). Tokenises stories to fixed-length [N, t_max] LongTensors plus an
 attention mask, following the sequence convention documented in config.DataConfig.
 """
 
@@ -18,20 +18,22 @@ from .config import DataConfig
 
 
 def load_persona_stories() -> dict[str, list[str]]:
-    """Return {persona: [story, ...]} for all k personas, from the HF dataset's `story` field.
+    """Return {cluster: [story, ...]} for all k clusters, from the HF dataset's `story` field.
 
-    Fails loudly if the dataset's persona set does not exactly match config.PERSONAS — a
-    mismatch means the artifact contract changed and every persona-indexed array downstream
-    would be silently misaligned.
+    The clusters-augment dataset labels each story by an INTEGER `cluster` column (0..4); the
+    old `persona` column exists but is empty here. We map cluster id i -> "cluster-{i}" (the
+    config.PERSONAS naming) and fail loudly if the integer cluster set does not exactly match
+    {0..k-1} — a mismatch means the artifact contract changed and every persona-indexed array
+    downstream would be silently misaligned.
     """
     ds = load_dataset(config.DATASET_REPO, split="train")
-    found = set(ds.unique("persona"))
-    expected = set(config.PERSONAS)
-    assert found == expected, f"dataset personas {found} != config.PERSONAS {expected}"
+    found = set(ds.unique("cluster"))
+    expected = set(range(len(config.PERSONAS)))
+    assert found == expected, f"dataset clusters {found} != expected {expected}"
 
     by_persona: dict[str, list[str]] = {p: [] for p in config.PERSONAS}
-    for persona, story in zip(ds["persona"], ds["story"]):
-        by_persona[persona].append(story)
+    for cluster, story in zip(ds["cluster"], ds["story"]):
+        by_persona[f"cluster-{cluster}"].append(story)
     return by_persona
 
 

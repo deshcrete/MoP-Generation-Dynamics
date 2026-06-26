@@ -22,10 +22,11 @@ Naive-Bayes choices (all deliberately simple, per AGENT.md):
     classifier).
 
 The structural [EOS] token (id 1) is excluded from the NB everywhere (it is the seed / terminator,
-not persona content). Persona stories D_i are truncated at t_max with no trailing EOS while base
-free-generations DO terminate in EOS, so counting EOS would spuriously hand the base class the
-terminal token of every rollout; dropping it keeps the components symmetric. Position 0 (the leading
-seed [EOS]) is likewise never counted, matching gamma (whose position-0 log-prob is nan).
+not cluster content). Cluster stories D_i are truncated at t_max with no trailing EOS, but the
+mixture (free / anchored) rollouts that eta scores DO terminate in EOS, so counting EOS would
+spuriously add the terminal token of every rollout to the likelihood; dropping it keeps the fit
+data and the scored rollouts symmetric. Position 0 (the leading seed [EOS]) is likewise never
+counted, matching gamma (whose position-0 log-prob is nan).
 """
 
 from __future__ import annotations

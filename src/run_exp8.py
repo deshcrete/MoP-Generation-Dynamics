@@ -1,10 +1,10 @@
 """Experiment 8 — Naive Bayes belief eta(t) vs generative posterior gamma(t).
 
 Fits a multinomial Naive Bayes classifier over the shared tokenizer's vocab on the training data
-(per-persona token counts over D_i; base from base-model free generations), uniform prior, and
+(per-cluster token counts over D_i; no base class — base == P_mix in this run), uniform prior, and
 accumulates a count-based belief eta_i(t) per token exactly as gamma_i(t) accumulates the
 specialists' neural log-probs. Overlays eta(t) (solid) on gamma(t) (dashed) for mixture rollouts —
-free (one per dominant component) and anchored-by-i (entry trigger, one per persona) — to test
+free (one per dominant component) and anchored-by-i (entry trigger, one per cluster) — to test
 whether the model's generative posterior tracks the theoretical Bayesian classifier. Also reports
 the population commit-time agreement tau_eta vs tau_gamma. See context/bayes_classifier.md.
 
@@ -33,8 +33,7 @@ from .commitment import COMPONENTS
 from .config import RunConfig
 
 # --- Exp 8 parameters (module constants, logged into the run dir) ---------------------------
-N_FIT_STORIES = 2000      # D_i stories per persona used to fit the NB token counts
-N_BASE_FIT = 1000         # base-model free generations used as the 'base' class data
+N_FIT_STORIES = 2000      # D_i stories per cluster used to fit the NB token counts
 NB_ALPHA = 1.0            # Laplace smoothing on the token counts
 N_COMMIT = 200            # free rollouts used for the tau_eta vs tau_gamma commit-time stats
 COMMIT_THRESH = 0.5       # a curve "commits" at the first t where its leading component exceeds this
@@ -145,9 +144,9 @@ def _plot_commit_scatter(tg: np.ndarray, te: np.ndarray, win_g: np.ndarray, win_
     fig.tight_layout(); fig.savefig(path, dpi=120); plt.close(fig)
 
 
-def _gamma_for(persona_models, base_model, ids, score_attn, device, bs) -> np.ndarray:
+def _gamma_for(persona_models, ids, score_attn, device, bs) -> np.ndarray:
     """Cumulative posterior gamma [N, C, T] over ids, scored under score_attn (uniform prior)."""
-    logp = commitment.per_model_token_logprobs(persona_models, base_model, ids, score_attn, device, bs)
+    logp = commitment.per_model_token_logprobs(persona_models, ids, score_attn, device, bs)
     return commitment.cumulative_posterior(logp, commitment.uniform_prior())
 
 
@@ -158,7 +157,7 @@ def main() -> None:
     os.makedirs(out_dir, exist_ok=True)
     cfg.to_json(os.path.join(out_dir, "config.json"))
     with open(os.path.join(out_dir, "exp8_params.json"), "w") as f:
-        json.dump({"N_FIT_STORIES": N_FIT_STORIES, "N_BASE_FIT": N_BASE_FIT, "NB_ALPHA": NB_ALPHA,
+        json.dump({"N_FIT_STORIES": N_FIT_STORIES, "NB_ALPHA": NB_ALPHA,
                    "N_COMMIT": N_COMMIT, "COMMIT_THRESH": COMMIT_THRESH,
                    "ANCHOR_VARIANT": ANCHOR_VARIANT, "TOP_NB": TOP_NB, "SEED_FIT": SEED_FIT}, f,
                   indent=2)
@@ -167,7 +166,6 @@ def main() -> None:
     tok = models.load_tokenizer()
     mixture_model = models.load_mixture_model(cfg.device)
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
     prior = commitment.uniform_prior()
 
     # =====================================================================================
@@ -178,15 +176,10 @@ def main() -> None:
     comp_ids: dict[str, torch.LongTensor] = {}
     comp_attn: dict[str, torch.LongTensor] = {}
     for comp in COMPONENTS:
-        if comp == "base":
-            base_cfg = dataclasses.replace(cfg.gen, n_samples=N_BASE_FIT)
-            samples = generate.free_generate(base_model, tok, base_cfg, cfg.device)
-            attn = generate.generation_attention_mask(samples, start=1)  # real emitted tokens only
-        else:
-            pool = stories[comp]
-            assert len(pool) >= N_FIT_STORIES, f"{comp}: only {len(pool)} stories, need {N_FIT_STORIES}"
-            chosen = rng.choice(len(pool), size=N_FIT_STORIES, replace=False)
-            samples, attn = data.tokenize_stories([pool[int(c)] for c in chosen], tok, cfg.data)
+        pool = stories[comp]
+        assert len(pool) >= N_FIT_STORIES, f"{comp}: only {len(pool)} stories, need {N_FIT_STORIES}"
+        chosen = rng.choice(len(pool), size=N_FIT_STORIES, replace=False)
+        samples, attn = data.tokenize_stories([pool[int(c)] for c in chosen], tok, cfg.data)
         comp_ids[comp], comp_attn[comp] = samples, attn
         print(f"[exp8]  fit data {comp:22s} n={samples.shape[0]:5d} tokens={int(attn.sum())}")
 
@@ -209,9 +202,9 @@ def main() -> None:
     free_all = torch.tensor(npz["samples"]); free_attn_all = torch.tensor(npz["attn"])
     free = free_all[:N_COMMIT]; free_attn = free_attn_all[:N_COMMIT]
     free_ids = free.numpy()
-    print(f"[exp8] scoring {free.shape[0]} free rollouts: gamma (specialists+base) and eta (naive Bayes) ...")
+    print(f"[exp8] scoring {free.shape[0]} free rollouts: gamma (cluster specialists) and eta (naive Bayes) ...")
 
-    gamma = _gamma_for(persona_models, base_model, free, free_attn, cfg.device, cfg.gen.batch_size)
+    gamma = _gamma_for(persona_models, free, free_attn, cfg.device, cfg.gen.batch_size)
     out_mask = ~np.isnan(gamma).all(axis=1)                            # [N, T]: where gamma is valid
     eta = bayes_nb.cumulative_nb_posterior(free_ids, out_mask, loglik, prior)  # [N, C, T]
     lengths = out_mask.shape[1] - np.argmax(out_mask[:, ::-1], axis=1)  # 1 past last valid t
@@ -264,7 +257,7 @@ def main() -> None:
     for p in config.PERSONAS:
         row = gen[p][:1]
         row_score = generate.generation_attention_mask(row, start=1)
-        g = _gamma_for(persona_models, base_model, row, row_score, cfg.device, cfg.gen.batch_size)[0]
+        g = _gamma_for(persona_models, row, row_score, cfg.device, cfg.gen.batch_size)[0]
         om = ~np.isnan(g).all(axis=0)                                 # [T]
         e = bayes_nb.cumulative_nb_posterior(row.numpy(), om[None], loglik, prior)[0]
         length = int(om.shape[0] - np.argmax(om[::-1]))

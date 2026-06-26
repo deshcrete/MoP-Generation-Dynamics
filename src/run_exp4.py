@@ -134,7 +134,7 @@ def _plot_w_curve(w: np.ndarray, counts: np.ndarray, path: str) -> None:
 # --- Part 4B plot --------------------------------------------------------------------------
 
 def _plot_individual_grid(items: list[tuple[str, np.ndarray, int]], suptitle: str, path: str) -> None:
-    """Grid of individual-rollout gamma_i(t) curves. Each item = (title, gamma[k+1, T], length)."""
+    """Grid of individual-rollout gamma_i(t) curves. Each item = (title, gamma[k, T], length)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -174,7 +174,6 @@ def main() -> None:
     tok = models.load_tokenizer()
     mixture_model = models.load_mixture_model(cfg.device)
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
 
     # =====================================================================================
     # Part 4A — w(t) inference from full next-token distributions
@@ -238,17 +237,17 @@ def main() -> None:
     npz = np.load(os.path.join(_latest("exp2_*"), "free_samples.npz"))
     free = torch.tensor(npz["samples"]); free_attn = torch.tensor(npz["attn"])
     print(f"[exp4] scoring {free.shape[0]} free rollouts under {len(COMPONENTS)} components ...")
-    free_logp = commitment.per_model_token_logprobs(persona_models, base_model, free, free_attn,
+    free_logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                     cfg.device, cfg.gen.batch_size)
-    gamma = commitment.cumulative_posterior(free_logp, commitment.uniform_prior())  # [n, k+1, T]
+    gamma = commitment.cumulative_posterior(free_logp, commitment.uniform_prior())  # [n, k, T]
 
     # last valid token position per sequence, and the gamma there
     n = gamma.shape[0]
     valid_g = ~np.isnan(gamma[:, 0, :])                                            # [n, T]
     last_t = valid_g.shape[1] - 1 - np.argmax(valid_g[:, ::-1], axis=1)            # last True index
-    final_gamma = gamma[np.arange(n), :, last_t]                                   # [n, k+1]
+    final_gamma = gamma[np.arange(n), :, last_t]                                   # [n, k]
 
-    # one example free rollout per dominant component (a rollout "from each persona", + base)
+    # one example free rollout per dominant component (a rollout "from each cluster")
     free_items = []
     for ci, name in enumerate(COMPONENTS):
         s = int(np.argmax(final_gamma[:, ci]))
@@ -266,9 +265,9 @@ def main() -> None:
     for p in config.PERSONAS:
         samples = gen[p][:1]                                                       # one rollout
         attn = generate.generation_attention_mask(samples, start=1)
-        logp = commitment.per_model_token_logprobs(persona_models, base_model, samples, attn,
+        logp = commitment.per_model_token_logprobs(persona_models, samples, attn,
                                                    cfg.device, cfg.gen.batch_size)
-        g = commitment.cumulative_posterior(logp, commitment.uniform_prior())[0]   # [k+1, T]
+        g = commitment.cumulative_posterior(logp, commitment.uniform_prior())[0]   # [k, T]
         vv = ~np.isnan(g[0])                                                       # valid positions
         length = (g.shape[1] - int(np.argmax(vv[::-1]))) if vv.any() else 1        # last valid + 1
         title = (f"anchored: {p} (`{tok.convert_ids_to_tokens(int(anchors[p][0]))}`)"

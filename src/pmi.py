@@ -95,8 +95,10 @@ def trigger_score(pmi: np.ndarray, counts: np.ndarray) -> np.ndarray:
     so it cannot rank among exclusive tokens; multiplying by the conditional reliability
     p(v | i, t) picks the token that is BOTH distinctive (high PMI / marginally rare) AND
     emitted dependably at that position (design_doc's "marginally rare but conditionally
-    frequent"). Empirically this recovers 'dear'@0 (epistolary), 'once'@0 (fairy_tale), while
-    behavioural personas top out an order of magnitude lower (no reliable entry token).
+    frequent"). Empirically this recovers a rare position-locked entry token for triggered
+    clusters (e.g. an opening word at position 0), while behavioural clusters top out an order of
+    magnitude lower (no reliable entry token). (On the original named personas this picked
+    'dear'@0 for Epistolary and 'once'@0 for Fairy-tale.)
     """
     persona_pos_tot = counts.sum(axis=2, keepdims=True)
     p_cond = np.divide(counts, persona_pos_tot, out=np.zeros_like(counts),
@@ -156,8 +158,8 @@ def modal_opening_phrase(counts: np.ndarray, persona_idx: int, max_len: int = 6,
     0,1,2,... taken while that modal token covers >= min_coverage of the persona's sequences
     at that position, up to max_len. Empirical n-gram trigger (e.g. 'once upon a time').
 
-    Returns a list of token ids (possibly length 1 when only the entry token is dependable,
-    as for epistolary where 'dear' is followed by varying names).
+    Returns a list of token ids (possibly length 1 when only the entry token is dependable —
+    e.g. an opening word followed by varying content).
     """
     phrase: list[int] = []
     for t in range(min(max_len, counts.shape[1])):

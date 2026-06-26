@@ -25,7 +25,7 @@ import numpy as np
 import torch
 from transformers import PreTrainedModel
 
-from . import models
+from . import config, models
 
 
 # --- Embedding extraction -------------------------------------------------------------------
@@ -103,11 +103,12 @@ def project(x: np.ndarray, pca: dict) -> np.ndarray:
 
 # --- Plotting -------------------------------------------------------------------------------
 
-# Fixed colour per component (config.PERSONAS + 'base' order); used by every Exp 5 plot.
-COMPONENT_COLORS = {
-    "absurdist": "#1f77b4", "epistolary": "#ff7f0e", "scientific_explainer": "#2ca02c",
-    "fairy_tale": "#d62728", "noir_detective": "#9467bd", "base": "#7f7f7f",
-}
+# Fixed colour per component, assigned by config.PERSONAS index (clusters are anonymous now, so
+# colours come from the tab10 palette by position rather than a hand-picked name->colour map).
+# Used by every Exp 5 plot. There is no 'base' component in this run (base == P_mix).
+_TAB10 = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+          "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+COMPONENT_COLORS = {p: _TAB10[i % len(_TAB10)] for i, p in enumerate(config.PERSONAS)}
 
 
 def _scatter_clusters(ax, cluster_proj: np.ndarray, cluster_names: list[str], components: list[str],

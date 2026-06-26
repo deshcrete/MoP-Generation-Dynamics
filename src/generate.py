@@ -137,15 +137,15 @@ def trigger_firing_rate(free_samples: torch.LongTensor, triggers: dict[str, dict
 
 @torch.no_grad()
 def hard_assign(samples: torch.LongTensor, attn: torch.LongTensor,
-                persona_models: dict[str, PreTrainedModel], base_model: PreTrainedModel,
+                persona_models: dict[str, PreTrainedModel],
                 device: str, batch_size: int = 250) -> np.ndarray:
-    """Label each sequence by argmax sequence-log-prob over {specialists + base}.
+    """Label each sequence by argmax sequence-log-prob over the cluster specialists.
 
-    Returns an int array of labels indexing config.PERSONAS + ['base'] (base = index k).
-    H1 prediction: many FREE generations are best explained by the base model.
+    Returns an int array of labels indexing config.PERSONAS (the k clusters). There is no base
+    component (P_mix == base in this run), so each generation is assigned to its closest cluster.
     """
-    names = config.PERSONAS + ["base"]
-    all_models = [persona_models[p] for p in config.PERSONAS] + [base_model]
+    names = config.PERSONAS
+    all_models = [persona_models[p] for p in config.PERSONAS]
     n = samples.shape[0]
     scores = torch.empty((n, len(names)), dtype=torch.float32)
     for s in range(0, n, batch_size):

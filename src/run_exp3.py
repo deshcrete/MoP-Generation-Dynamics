@@ -1,13 +1,14 @@
 """Experiment 3 — Persona commitment dynamics.
 
-Localises WHERE triggered personas are lost during generation:
-  - Free regime (reuses Exp 2's free_samples.npz): does any triggered persona's gamma_i ever
-    rise, or is it dead from t=1 (entry failure)? Does r_i(t) drift toward base (compounding)?
+Localises WHERE triggered clusters are lost during generation:
+  - Free regime (reuses Exp 2's free_samples.npz): does any triggered cluster's gamma_i ever
+    rise, or is it dead from t=1 (entry failure)? Does r_i(t) drift away (compounding)?
   - Anchored-by-i regime (entry-variant single-token trigger, regenerated here): does gamma_i
-    stay committed after the trigger or decay back to base?
+    stay committed after the trigger or decay back toward the other clusters?
 
-Priors (logged): 'uniform' over personas+base, and 'free' = the Exp 2 free hard-assignment
-empirical distribution (the apples-to-apples prior). Components include base (see commitment.py).
+Priors (logged): 'uniform' over the clusters, and 'free' = the Exp 2 free hard-assignment
+empirical distribution (the apples-to-apples prior). Components = the k clusters (no base
+component; base == P_mix in this run — see commitment.py).
 
 Run:  python -m src.run_exp3   (CPU fallback: CUDA_VISIBLE_DEVICES='' PYTORCH_NVML_BASED_CUDA_CHECK=0 python -u -m src.run_exp3)
 Writes results/exp3_<timestamp>/: config.json, free_gamma_<prior>.png, free_responsibility_<prior>.png,
@@ -70,9 +71,8 @@ def main() -> None:
     tok = models.load_tokenizer()
     mixture_model = models.load_mixture_model(cfg.device)
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
 
-    # Priors over COMPONENTS (personas + base)
+    # Priors over COMPONENTS (the k clusters)
     exp2_dir = _latest("exp2_*")
     free_counts = pd.read_csv(os.path.join(exp2_dir, "free_assignment.csv")).iloc[0].to_dict()
     priors = {"uniform": commitment.uniform_prior(),
@@ -83,7 +83,7 @@ def main() -> None:
     npz = np.load(os.path.join(exp2_dir, "free_samples.npz"))
     free = torch.tensor(npz["samples"]); free_attn = torch.tensor(npz["attn"])
     print(f"[exp3] free: scoring {free.shape[0]} sequences under {len(COMPONENTS)} components ...")
-    free_logp = commitment.per_model_token_logprobs(persona_models, base_model, free, free_attn,
+    free_logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                     cfg.device, cfg.gen.batch_size)
 
     summary_rows = []
@@ -116,20 +116,18 @@ def main() -> None:
     for p in config.PERSONAS:
         samples = gen[p]
         attn = generate.generation_attention_mask(samples, start=1)   # keep trigger (pos 1) scored
-        logp = commitment.per_model_token_logprobs(persona_models, base_model, samples, attn,
+        logp = commitment.per_model_token_logprobs(persona_models, samples, attn,
                                                    cfg.device, cfg.gen.batch_size)
         for prior_name, pi in priors.items():
             gamma = commitment.cumulative_posterior(logp, pi)
             gc = commitment.mean_curves(gamma)
             i = config.PERSONAS.index(p)
-            intended_gamma[prior_name][p] = gc["mean"][i]             # this persona's own gamma
-            base_i = COMPONENTS.index("base")
+            intended_gamma[prior_name][p] = gc["mean"][i]             # this cluster's own gamma
             summary_rows.append({
                 "regime": f"anchored:{p}", "prior": prior_name, "component": p,
                 "gamma_t1": float(gc["mean"][i, 1]),
                 "gamma_late": float(np.nanmean(gc["mean"][i, 8:32])),
                 "resp_t1": np.nan, "resp_late": np.nan,
-                "base_gamma_late": float(np.nanmean(gc["mean"][base_i, 8:32])),
             })
 
     # overlay: each persona's own gamma_i(t) on its anchored gens (does commitment hold?)
@@ -154,9 +152,9 @@ def main() -> None:
     print("\n[exp3] FREE gamma at t=1 vs late (prior=uniform) — triggered personas should be flat-low:")
     f = summary[(summary.regime == "free") & (summary.prior == "uniform")]
     print(f[["component", "gamma_t1", "gamma_late", "resp_t1", "resp_late"]].round(3).to_string(index=False))
-    print("\n[exp3] ANCHORED-by-i: intended persona's gamma at t=1 vs late (prior=uniform):")
+    print("\n[exp3] ANCHORED-by-i: intended cluster's gamma at t=1 vs late (prior=uniform):")
     a = summary[summary.regime.str.startswith("anchored") & (summary.prior == "uniform")]
-    print(a[["regime", "gamma_t1", "gamma_late", "base_gamma_late"]].round(3).to_string(index=False))
+    print(a[["regime", "gamma_t1", "gamma_late"]].round(3).to_string(index=False))
     print(f"\n[exp3] done. results in {out_dir}")
 
 

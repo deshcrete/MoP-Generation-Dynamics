@@ -60,11 +60,10 @@ def _load_one(repo: str, device: str, dtype: torch.dtype) -> PreTrainedModel:
     return model.to(device).eval()
 
 
-def load_base_model(device: str, dtype: torch.dtype = torch.float32) -> PreTrainedModel:
-    return _load_one(config.BASE_REPO, device, dtype)
-
-
 def load_mixture_model(device: str, dtype: torch.dtype = torch.float32) -> PreTrainedModel:
+    """Load P_mix. In this run P_mix IS the base model (config.MIXTURE_REPO = SimpleStories-V2-5M):
+    we decompose the base model over the cluster specialists, so there is no separate base model
+    and no load_base_model — the 'base' component was dropped (see config.py)."""
     return _load_one(config.MIXTURE_REPO, device, dtype)
 
 

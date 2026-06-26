@@ -1,9 +1,9 @@
 """Experiment 7 — persona probe.
 
 A linear classifier over the mixture model's residual-stream representation of a PREFIX, predicting
-the source persona (config.PERSONAS + 'base'). Applied to a mixture generation it yields a
-discriminative belief beta_i(t) over personas, compared in run_exp7 to the generative cumulative
-posterior gamma_i(t) (commitment.py). See context/classifier_expr.md.
+the source cluster (config.PERSONAS; no 'base' class — base == P_mix in this run). Applied to a
+mixture generation it yields a discriminative belief beta_i(t) over clusters, compared in run_exp7
+to the generative cumulative posterior gamma_i(t) (commitment.py). See context/classifier_expr.md.
 
 Representation (decided, Exp 5 finding): the probe input at position t is the RUNNING-MEAN prefix
 embedding e_bar(t) = mean_{s<=t} e(s) of P_mix's residual stream — a single-position embedding is
@@ -86,7 +86,7 @@ class MultinomialProbe:
     """Multinomial logistic regression with stored standardisation (mu, sd) and weights (W, b).
 
     predict_proba standardises with the TRAINING mu/sd, then softmax(x_std @ W.T + b). beta columns
-    are in the class order the probe was trained with (run_exp7 uses COMPONENTS = personas + base).
+    are in the class order the probe was trained with (run_exp7 uses COMPONENTS = the k clusters).
     """
 
     def __init__(self, mu: np.ndarray, sd: np.ndarray, W: np.ndarray, b: np.ndarray,

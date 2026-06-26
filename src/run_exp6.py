@@ -197,28 +197,27 @@ def main() -> None:
 
     tok = models.load_tokenizer()
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
 
-    # all personas; class (triggered/behavioural) read from Exp 1 taxonomy for context/labels
+    # all clusters; class (triggered/behavioural) read from Exp 1 taxonomy for context/labels
     taxonomy = pd.read_csv(os.path.join(_latest("exp1_*"), "taxonomy.csv"))
     persona_class = dict(zip(taxonomy["persona"], taxonomy["class"]))
     print(f"[exp6] personas: {config.PERSONAS}")
 
-    # free generations from Exp 2; score under personas+base; gamma + r with uniform prior
+    # free generations from Exp 2; score under the cluster specialists; gamma + r with uniform prior
     npz = np.load(os.path.join(_latest("exp2_*"), "free_samples.npz"))
     free = torch.tensor(npz["samples"]); free_attn = torch.tensor(npz["attn"])
     print(f"[exp6] scoring {free.shape[0]} free rollouts under {K_COMPONENTS} components ...")
-    logp = commitment.per_model_token_logprobs(persona_models, base_model, free, free_attn,
+    logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                cfg.device, cfg.gen.batch_size)
     pi = commitment.uniform_prior()
-    gamma = commitment.cumulative_posterior(logp, pi)        # [n, k+1, T]
-    resp = commitment.token_responsibility(logp, pi)         # [n, k+1, T]
+    gamma = commitment.cumulative_posterior(logp, pi)        # [n, k, T]
+    resp = commitment.token_responsibility(logp, pi)         # [n, k, T]
 
     # per-sequence last valid token position and the final cumulative posterior there
     n, _, T = gamma.shape
     valid_g = ~np.isnan(gamma[:, 0, :])                      # [n, T]
     last_t = T - 1 - np.argmax(valid_g[:, ::-1], axis=1)     # last valid index per sequence
-    final_gamma = gamma[np.arange(n), :, last_t]             # [n, k+1]
+    final_gamma = gamma[np.arange(n), :, last_t]             # [n, k]
     argmax_comp = np.nanargmax(np.where(np.isnan(resp), -np.inf, resp), axis=1)  # [n, T] winner/token
 
     summary_rows = []

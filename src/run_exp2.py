@@ -1,8 +1,8 @@
 """Experiment 2 — Free vs Anchored generation (tests H1, H2, H3; closes Exp 0 step 3).
 
-  - Free: sample from P_mix at the neutral [EOS] seed. Measure trigger firing rate vs D_i,
-    EM weights pi_free (the documented FAILURE repro — Exp 0 step 3), and hard-assignment
-    against {specialists + base}.
+  - Free: sample from P_mix (= the base model) at the neutral [EOS] seed. Measure trigger firing
+    rate vs D_i, EM weights pi_free (the documented FAILURE repro — Exp 0 step 3), and
+    hard-assignment against the cluster specialists (no base component; base == P_mix).
   - Anchored: for each of the three anchor variants from Exp 1 (entry / argmax / phrase),
     prepend the trigger and autoregress, giving every persona a uniform N/k budget. Measure
     EM weights pi_anchored and per-persona hard-assignment. Compare the variants (H3).
@@ -32,7 +32,7 @@ from .config import DataConfig, RunConfig
 ANCHOR_VARIANTS = ["entry", "argmax", "phrase"]
 FIRING_DATA = DataConfig(t_max=128, prepend_eos=False, append_eos=False)
 FIRING_PER_PERSONA = 2000          # D_i subsample for dataset firing-rate baseline
-LABELS = config.PERSONAS + ["base"]
+LABELS = config.PERSONAS           # no base component (base == P_mix in this run)
 
 
 def _latest_exp1_triggers() -> dict:
@@ -63,7 +63,6 @@ def main() -> None:
     tok = models.load_tokenizer()
     mixture_model = models.load_mixture_model(cfg.device)
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
 
     trig = _latest_exp1_triggers()
     triggers, anchors_all = trig["triggers"], trig["anchors"]
@@ -93,7 +92,7 @@ def main() -> None:
                   "abs_error": np.abs(pi_free - sigma)}).to_csv(
         os.path.join(out_dir, "pi_free.csv"), index=False)
 
-    free_labels = generate.hard_assign(free, free_attn, persona_models, base_model, cfg.device)
+    free_labels = generate.hard_assign(free, free_attn, persona_models, cfg.device)
     free_counts = _assignment_counts(free_labels)
     pd.DataFrame([free_counts]).to_csv(os.path.join(out_dir, "free_assignment.csv"), index=False)
 
@@ -117,7 +116,7 @@ def main() -> None:
             attn = generate.generation_attention_mask(samples, start=start)
             seq_lp_parts.append(models.score_sequences(persona_models, samples, attn,
                                                        cfg.device, cfg.gen.batch_size).numpy())
-            labels = generate.hard_assign(samples, attn, persona_models, base_model, cfg.device)
+            labels = generate.hard_assign(samples, attn, persona_models, cfg.device)
             all_labels.append(labels)
             # per-persona: where did this persona's anchored gens get assigned?
             row = {"variant": variant, "intended": p, "anchor_text": anchors_all[p][variant]["text"]}

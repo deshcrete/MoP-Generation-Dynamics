@@ -1,12 +1,12 @@
-mixture model:
-desh2806/simplestories-persona-mixture
+mixture model (base-as-mixture: the base model itself is P_mix, decomposed over the clusters; vocab 4019, shared tokenizer with the cluster specialists):
+SimpleStories/SimpleStories-V2-5M
 
 persona models:
-desh2806/simplestories-persona-absurdist
-desh2806/simplestories-persona-epistolary
-desh2806/simplestories-persona-scientific_explainer
-desh2806/simplestories-persona-fairy_tale
-desh2806/simplestories-persona-noir_detective
+desh2806/simplestories-persona-cluster-0
+desh2806/simplestories-persona-cluster-1
+desh2806/simplestories-persona-cluster-2
+desh2806/simplestories-persona-cluster-3
+desh2806/simplestories-persona-cluster-4
 
 datasets:
-desh2806/simplestories-personas-10k
+desh2806/simplestories-persona-clusters-augment

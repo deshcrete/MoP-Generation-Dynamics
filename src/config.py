@@ -16,28 +16,30 @@ import json
 import os
 
 
-# --- Personas and the known training mixture -------------------------------------------
+# --- Personas (clusters) and the known mixture -----------------------------------------
 
-# Order is fixed and used everywhere persona-indexed arrays are built ([k, ...]).
-PERSONAS: list[str] = [
-    "absurdist",
-    "epistolary",
-    "scientific_explainer",
-    "fairy_tale",
-    "noir_detective",
-]
+# This run decomposes the BASE model over 5 persona-CLUSTER specialists (see src/sources.txt).
+# The "personas" are now anonymous clusters cluster-0..cluster-4 (the dataset's `cluster` label,
+# data.py maps the integer cluster id -> "cluster-{i}"). Order is fixed and used everywhere
+# persona-indexed arrays are built ([k, ...]); index i corresponds to cluster i.
+PERSONAS: list[str] = [f"cluster-{i}" for i in range(5)]
 
-# Mixture model was trained on the uniform union of all 5 personas (README), so the known
-# training proportions sigma are uniform. Kept explicit so a non-uniform run is a one-line
-# change rather than a hidden assumption.
+# The thing we decompose (MIXTURE_REPO below) is the base model itself, treated as P_mix:
+# "what mixture of the cluster specialists explains the base model's free generation?" The
+# clusters were carved uniformly (~10k stories each) from the dataset, so the reference
+# proportions sigma are uniform. Kept explicit so a non-uniform run is a one-line change.
 SIGMA: dict[str, float] = {p: 1.0 / len(PERSONAS) for p in PERSONAS}
 
 
 # --- HuggingFace artifact ids (from src/sources.txt) -----------------------------------
 
-DATASET_REPO: str = "desh2806/simplestories-personas-10k"
-MIXTURE_REPO: str = "desh2806/simplestories-persona-mixture"
-BASE_REPO: str = "SimpleStories/SimpleStories-V2-5M"
+DATASET_REPO: str = "desh2806/simplestories-persona-clusters-augment"
+# P_mix = the base model itself (base-as-mixture). We use SimpleStories-V2-5M, the model the
+# cluster specialists were fine-tuned from, NOT SimpleStories-5M (vocab 4096) which is a different
+# model with an incompatible tokenizer — the specialists are vocab 4019 and EM/scoring requires a
+# shared tokenizer (load_tokenizer asserts len==4019). There is no separate base model: base ==
+# mixture, so the old 'base' component is dropped and we decompose over the 5 clusters only.
+MIXTURE_REPO: str = "SimpleStories/SimpleStories-V2-5M"
 PERSONA_REPOS: dict[str, str] = {p: f"desh2806/simplestories-persona-{p}" for p in PERSONAS}
 
 

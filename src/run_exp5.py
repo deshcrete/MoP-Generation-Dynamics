@@ -1,10 +1,11 @@
 """Experiment 5 — Persona commitment via prefix-embedding trajectories.
 
-Plots fixed persona reference clusters (real dataset stories D_i + base-model free generations for
-base, all embedded through P_mix) and, on top of them, the mixture model's prefix embedding e(t) at
-each token position of a rollout — a path through cluster space that makes commitment (and its
-speed) visible. The geometric companion to Exp 3/4's gamma/w curves. A per-token cumulative-LLR
-plot pairs the qualitative trajectory with a quantitative "speed of updates" view.
+Plots fixed cluster reference clusters (real dataset stories D_i, all embedded through P_mix) and,
+on top of them, the mixture model's prefix embedding e(t) at each token position of a rollout — a
+path through cluster space that makes commitment (and its speed) visible. The geometric companion
+to Exp 3/4's gamma/w curves. A per-token cumulative-LLR plot pairs the qualitative trajectory with
+a quantitative "speed of updates" view. P_mix IS the base model here, so there is no separate base
+cluster; the LLR reference is P_mix (= base) itself.
 
 Run:  python -m src.run_exp5
 CPU fallback: CUDA_VISIBLE_DEVICES='' PYTORCH_NVML_BASED_CUDA_CHECK=0 python -u -m src.run_exp5
@@ -52,18 +53,18 @@ def _valid_len(fwd_mask_row: np.ndarray) -> int:
     return int(fwd_mask_row.sum())
 
 
-def _cumulative_llr(logp: np.ndarray) -> np.ndarray:
-    """Cumulative log-likelihood-ratio of each component vs base, [k+1, T] from logp [1, k+1, T].
+def _cumulative_llr(logp: np.ndarray, base_logp: np.ndarray) -> np.ndarray:
+    """Cumulative log-likelihood-ratio of each cluster vs P_mix(=base), [k, T] from logp [1, k, T].
 
-    LLR_i(t) = sum_{s<=t} ( logp_i[s] - logp_base[s] ); the base row is identically 0 (reference).
-    nan positions (seq position 0, padding) contribute 0 to the running sum, mirroring
-    commitment.cumulative_posterior. An UNBOUNDED evidence-rate view (cf. Exp 3's bounded gamma):
-    a steep climb = high-frequency/spiky updates (triggered), a gentle slope = gradual (behavioural).
+    base_logp is P_mix's own per-token log-prob [1, T] (P_mix IS the base model here, so it is the
+    natural reference). LLR_i(t) = sum_{s<=t} ( logp_i[s] - base_logp[s] ). nan positions (seq
+    position 0, padding) contribute 0 to the running sum, mirroring commitment.cumulative_posterior.
+    An UNBOUNDED evidence-rate view (cf. Exp 3's bounded gamma): a steep climb = high-frequency/spiky
+    updates (triggered), a gentle slope = gradual (behavioural).
     """
-    base = logp[:, -1:, :]                                  # [1, 1, T] base log-probs
-    diff = logp - base                                     # [1, k+1, T]; base row -> 0
+    diff = logp - base_logp[:, None, :]                    # [1, k, T]; vs P_mix(=base)
     contrib = np.where(np.isnan(diff), 0.0, diff)
-    return np.cumsum(contrib, axis=2)[0]                   # [k+1, T]
+    return np.cumsum(contrib, axis=2)[0]                   # [k, T]
 
 
 def _plot_llr_grid(items: list[tuple[str, np.ndarray, int]], suptitle: str, path: str,
@@ -110,7 +111,6 @@ def main() -> None:
     tok = models.load_tokenizer()
     mixture_model = models.load_mixture_model(cfg.device)
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
 
     def embed(model, ids, attn):  # cluster/sequence embedding under P_mix's residual stream
         return embed_traj.sequence_embeddings(model, ids, attn, cfg.device, EMBED_LAYER, CLUSTER_BS)
@@ -119,9 +119,9 @@ def main() -> None:
         return embed_traj.l2_normalize(x) if L2_NORMALIZE else x
 
     # =====================================================================================
-    # Clusters — real D_i stories (+ base-model free generations for base), embedded by P_mix
+    # Clusters — real D_i stories per cluster, embedded by P_mix (no base cluster: base == P_mix)
     # =====================================================================================
-    print(f"[exp5] building clusters: {N_CLUSTER} D_i stories/persona + {N_CLUSTER} base free-gens ...")
+    print(f"[exp5] building clusters: {N_CLUSTER} D_i stories/cluster ...")
     stories = data.load_persona_stories()
     rng = np.random.default_rng(SEED_CLUSTER)
     cluster_emb_list, cluster_names = [], []
@@ -132,13 +132,6 @@ def main() -> None:
         ids, attn = data.tokenize_stories([pool[int(c)] for c in chosen], tok, cfg.data)
         cluster_emb_list.append(embed(mixture_model, ids, attn))     # [N_CLUSTER, H]
         cluster_names += [persona] * N_CLUSTER
-
-    # base cluster: base model B has no dataset, so use B's own free generations (embedded by P_mix)
-    base_gen_cfg = dataclasses.replace(cfg.gen, n_samples=N_CLUSTER)
-    base_samples = generate.free_generate(base_model, tok, base_gen_cfg, cfg.device)
-    base_fwd = token_dist.forward_attention_mask(base_samples)
-    cluster_emb_list.append(embed(mixture_model, base_samples, base_fwd))
-    cluster_names += ["base"] * N_CLUSTER
 
     cluster_emb = np.concatenate(cluster_emb_list, axis=0)           # [M, H]
     pca = embed_traj.fit_pca(normed(cluster_emb), n_components=2)
@@ -170,12 +163,12 @@ def main() -> None:
     npz = np.load(os.path.join(_latest("exp2_*"), "free_samples.npz"))
     free = torch.tensor(npz["samples"]); free_attn = torch.tensor(npz["attn"])
     print(f"[exp5] scoring {free.shape[0]} free rollouts to pick one per dominant component ...")
-    free_logp = commitment.per_model_token_logprobs(persona_models, base_model, free, free_attn,
+    free_logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                     cfg.device, cfg.gen.batch_size)
-    gamma = commitment.cumulative_posterior(free_logp, commitment.uniform_prior())   # [n, k+1, T]
+    gamma = commitment.cumulative_posterior(free_logp, commitment.uniform_prior())   # [n, k, T]
     valid_g = ~np.isnan(gamma[:, 0, :])
     last_t = valid_g.shape[1] - 1 - np.argmax(valid_g[:, ::-1], axis=1)
-    final_gamma = gamma[np.arange(gamma.shape[0]), :, last_t]                         # [n, k+1]
+    final_gamma = gamma[np.arange(gamma.shape[0]), :, last_t]                         # [n, k]
 
     free_trajs = []
     for ci, name in enumerate(COMPONENTS):
@@ -184,6 +177,11 @@ def main() -> None:
         title = f"free — dominant: {name} (gamma={final_gamma[s, ci]:.2f})"
         free_trajs.append((title, traj))
         traj_store[f"free_{name}"] = traj
+
+    # the LEAST-committed free rollout (lowest peak gamma over clusters) — the closest analog of
+    # "drifts to base / stays generic" now that base is not a component; used in the overlay below.
+    s_unc = int(np.argmin(final_gamma.max(axis=1)))
+    traj_store["free_uncommitted"] = project_trajectory(mixture_model, free[s_unc:s_unc + 1])
     embed_traj.plot_trajectory_grid(cluster_proj, cluster_names, COMPONENTS, free_trajs,
                                     "Exp 5 — FREE prefix-embedding trajectories (P_mix, PCA of D_i)",
                                     os.path.join(out_dir, "free_trajectories.png"))
@@ -206,11 +204,14 @@ def main() -> None:
         anchored_trajs.append((title, traj))
         traj_store[f"anchored_{p}"] = traj
 
-        # LLR companion: attend the real tokens (incl. seed + anchor), score every component vs base
+        # LLR companion: attend the real tokens (incl. seed + anchor), score every cluster vs
+        # P_mix(=base). base_lp is P_mix's own per-token log-prob, the reference for the ratio.
         fwd = token_dist.forward_attention_mask(row)
-        logp = commitment.per_model_token_logprobs(persona_models, base_model, row, fwd,
+        logp = commitment.per_model_token_logprobs(persona_models, row, fwd,
                                                    cfg.device, cfg.gen.batch_size)
-        llr = _cumulative_llr(logp)
+        base_lp = models.token_logprobs(mixture_model, row.to(cfg.device),
+                                        fwd.to(cfg.device)).cpu().numpy()    # [1, T]
+        llr = _cumulative_llr(logp, base_lp)
         llr_items.append((title, llr, _valid_len(fwd[0].numpy())))
 
     embed_traj.plot_trajectory_grid(cluster_proj, cluster_names, COMPONENTS, anchored_trajs,
@@ -224,7 +225,7 @@ def main() -> None:
     # =====================================================================================
     overlay = [(f"anchored {p}", embed_traj.COMPONENT_COLORS[p], traj_store[f"anchored_{p}"])
                for p in config.PERSONAS]
-    overlay.append(("free (base-dominant)", "black", traj_store["free_base"]))
+    overlay.append(("free (least committed)", "black", traj_store["free_uncommitted"]))
     embed_traj.plot_trajectory_overlay(cluster_proj, cluster_names, COMPONENTS, overlay,
                                        "Exp 5 — trajectory overlay (anchored vs free)",
                                        os.path.join(out_dir, "trajectories_overlay.png"))

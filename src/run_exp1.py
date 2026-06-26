@@ -96,9 +96,13 @@ def main() -> None:
                               "p_v_given_i": float(p_cond_marg[i, v]), "signal": float(w[v])})
     pd.DataFrame(marg_rows).to_csv(os.path.join(out_dir, "marginal_trigger_table.csv"), index=False)
 
-    # Concentration + taxonomy. Threshold set from the anchoring contrast and LOGGED.
+    # Concentration + taxonomy. The clusters are anonymous, so the triggered/behavioural cutoff is
+    # found from the DATA: a 1-D natural-break (largest-gap) split of the sorted C_i values. The
+    # threshold is the midpoint of the widest gap between consecutive sorted C_i, and is LOGGED.
     C = pmi.concentration(pmi_pos, counts)
-    threshold = (C["epistolary"] + C["scientific_explainer"]) / 2.0
+    c_sorted = np.array(sorted(C.values()))                       # ascending
+    gap_idx = int(np.argmax(np.diff(c_sorted)))                   # widest gap is (gap_idx, gap_idx+1)
+    threshold = float((c_sorted[gap_idx] + c_sorted[gap_idx + 1]) / 2.0)
     taxonomy = pmi.classify(C, threshold)
     # Peak trigger score per persona is reported alongside C_i: it is the cleaner separator and
     # the magnitude of the persona's single best anchor token (max over (v,t)).
@@ -121,7 +125,7 @@ def main() -> None:
         _heatmap(pmi_pos, counts, i, persona, tok,
                  os.path.join(out_dir, "heatmaps", f"{persona}.png"))
 
-    print(f"[exp1] threshold C (midpoint epistolary/scientific_explainer) = {threshold:.3f}")
+    print(f"[exp1] threshold C (largest-gap natural break of sorted C_i) = {threshold:.3f}")
     print(tax_df.to_string(index=False))
     print("\n[exp1] top trigger per persona:")
     for p in config.PERSONAS:

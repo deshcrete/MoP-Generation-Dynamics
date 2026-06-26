@@ -107,16 +107,15 @@ def main() -> None:
     tok = models.load_tokenizer()
     mixture_model = models.load_mixture_model(cfg.device)
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
     clf = _load_probe(exp7_dir)
 
-    # free generations from Exp 2; gamma (specialists+base, uniform prior) and beta (probe)
+    # free generations from Exp 2; gamma (cluster specialists, uniform prior) and beta (probe)
     npz = np.load(os.path.join(_latest("exp2_*"), "free_samples.npz"))
     free = torch.tensor(npz["samples"]); free_attn = torch.tensor(npz["attn"])
     print(f"[exp7g] scoring {free.shape[0]} free rollouts: gamma + beta ...")
-    logp = commitment.per_model_token_logprobs(persona_models, base_model, free, free_attn,
+    logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                cfg.device, cfg.gen.batch_size)
-    gamma = commitment.cumulative_posterior(logp, commitment.uniform_prior())   # [N, k+1, T]
+    gamma = commitment.cumulative_posterior(logp, commitment.uniform_prior())   # [N, k, T]
     fwd = token_dist.forward_attention_mask(free)
     beta = clf.predict_proba(probe.prefix_running_mean(mixture_model, free, fwd, cfg.device,
                                                        EMBED_LAYER, L2_NORMALIZE, FEAT_BS))  # [N,T,C]

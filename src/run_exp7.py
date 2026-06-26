@@ -1,7 +1,7 @@
 """Experiment 7 — persona probe: discriminative belief beta(t) vs generative posterior gamma(t).
 
 Trains a linear probe on P_mix's running-mean prefix embedding e_bar(t) to predict the source
-persona (COMPONENTS = personas + base), then for mixture rollouts overlays the probe's belief
+cluster (COMPONENTS = the k clusters; no base class — base == P_mix), then for mixture rollouts overlays the probe's belief
 beta_i(t) on the generative cumulative posterior gamma_i(t) of Exp 3/4, and tests whether the
 representation commits before/with/after the posterior (tau_beta vs tau_gamma). See
 context/classifier_expr.md.
@@ -208,14 +208,13 @@ def main() -> None:
     tok = models.load_tokenizer()
     mixture_model = models.load_mixture_model(cfg.device)
     persona_models = models.load_persona_models(cfg.device)
-    base_model = models.load_base_model(cfg.device)
 
     def feats(ids, attn):  # running-mean prefix embeddings under P_mix for a batch of sequences
         return probe.prefix_running_mean(mixture_model, ids, attn, cfg.device, EMBED_LAYER,
                                          L2_NORMALIZE, FEAT_BS)
 
     # =====================================================================================
-    # Build probe train/test sets: e_bar(t) examples per class (5 personas + base)
+    # Build probe train/test sets: e_bar(t) examples per class (the k clusters; no base class)
     # =====================================================================================
     rng = np.random.default_rng(SEED_PROBE)
     n_per = N_TRAIN_STORIES + N_TEST_STORIES
@@ -223,16 +222,10 @@ def main() -> None:
     Xtr, ytr, Xte, yte, poste = [], [], [], [], []
 
     for ci, comp in enumerate(COMPONENTS):
-        if comp == "base":
-            # base has no dataset: its examples are base-model free generations (as Exp 5's base cluster)
-            base_cfg = dataclasses.replace(cfg.gen, n_samples=n_per)
-            samples = generate.free_generate(base_model, tok, base_cfg, cfg.device)
-            attn = token_dist.forward_attention_mask(samples)
-        else:
-            pool = stories[comp]
-            assert len(pool) >= n_per, f"{comp}: only {len(pool)} stories, need {n_per}"
-            chosen = rng.choice(len(pool), size=n_per, replace=False)
-            samples, attn = data.tokenize_stories([pool[int(c)] for c in chosen], tok, cfg.data)
+        pool = stories[comp]
+        assert len(pool) >= n_per, f"{comp}: only {len(pool)} stories, need {n_per}"
+        chosen = rng.choice(len(pool), size=n_per, replace=False)
+        samples, attn = data.tokenize_stories([pool[int(c)] for c in chosen], tok, cfg.data)
 
         feat = feats(samples, attn)                          # [n_per, T, H]
         lengths = attn.sum(dim=1).numpy()
@@ -299,7 +292,7 @@ def main() -> None:
     fwd = token_dist.forward_attention_mask(free)                      # seed attended (beta regime)
     print(f"[exp7] scoring {free.shape[0]} free rollouts: gamma (specialists+base) and beta (probe) ...")
 
-    free_logp = commitment.per_model_token_logprobs(persona_models, base_model, free, free_attn,
+    free_logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                     cfg.device, cfg.gen.batch_size)
     gamma = commitment.cumulative_posterior(free_logp, commitment.uniform_prior())   # [N, k+1, T]
     beta = clf.predict_proba(feats(free, fwd))                         # [N, T, C]
@@ -355,7 +348,7 @@ def main() -> None:
         row_fwd = token_dist.forward_attention_mask(row)
         row_score = generate.generation_attention_mask(row, start=1)
         g = commitment.cumulative_posterior(
-            commitment.per_model_token_logprobs(persona_models, base_model, row, row_score,
+            commitment.per_model_token_logprobs(persona_models, row, row_score,
                                                 cfg.device, cfg.gen.batch_size),
             commitment.uniform_prior())[0]                            # [C, T]
         b = clf.predict_proba(feats(row, row_fwd))[0].T               # [C, T]
