@@ -1,0 +1,22 @@
+[exp3] device=cuda  out=/MoP-Generation-Dynamics/results/exp3_20260626_144807
+[exp3] priors: uniform and free={'cluster-0': np.float64(0.027), 'cluster-1': np.float64(0.34), 'cluster-2': np.float64(0.413), 'cluster-3': np.float64(0.101), 'cluster-4': np.float64(0.119)}
+[exp3] free: scoring 1000 sequences under 5 components ...
+[exp3] anchored (entry): regenerating ...
+
+[exp3] FREE gamma at t=1 vs late (prior=uniform) — triggered personas should be flat-low:
+component  gamma_t1  gamma_late  resp_t1  resp_late
+cluster-0     0.131       0.052    0.131      0.170
+cluster-1     0.280       0.293    0.280      0.213
+cluster-2     0.359       0.390    0.359      0.232
+cluster-3     0.082       0.095    0.082      0.188
+cluster-4     0.148       0.170    0.148      0.197
+
+[exp3] ANCHORED-by-i: intended cluster's gamma at t=1 vs late (prior=uniform):
+            regime  gamma_t1  gamma_late
+anchored:cluster-0     0.231       0.111
+anchored:cluster-1     0.239       0.372
+anchored:cluster-2     0.596       0.510
+anchored:cluster-3     0.078       0.078
+anchored:cluster-4     0.226       0.227
+
+[exp3] done. results in /MoP-Generation-Dynamics/results/exp3_20260626_144807

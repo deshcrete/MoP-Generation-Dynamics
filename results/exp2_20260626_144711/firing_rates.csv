@@ -1,0 +1,6 @@
+persona,trigger,pos,dataset_rate_at_pos,free_rate_at_pos,dataset_rate_anywhere,free_rate_anywhere
+cluster-0,.,6,0.0885,0.01,1.0,1.0
+cluster-1,",",8,0.095,0.034,1.0,1.0
+cluster-2,",",7,0.126,0.064,1.0,1.0
+cluster-3,named,8,0.1225,0.028,0.889,0.419
+cluster-4,friends,8,0.0545,0.004,0.6945,0.164

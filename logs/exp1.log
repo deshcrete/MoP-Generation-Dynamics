@@ -1,0 +1,19 @@
+[exp1] out=/MoP-Generation-Dynamics/results/exp1_20260626_144603  t_max=64 prepend_eos=False
+Token indices sequence length is longer than the specified maximum sequence length for this model (524 > 512). Running this sequence through the model will result in indexing errors
+[exp1] tokenised union: 63779 stories
+[exp1] threshold C (largest-gap natural break of sorted C_i) = 0.003
+  persona      C_i  max_trigger_score       class
+cluster-0 0.003836           0.137771   triggered
+cluster-1 0.002022           0.062203 behavioural
+cluster-2 0.001638           0.058658 behavioural
+cluster-3 0.004303           0.138260   triggered
+cluster-4 0.002397           0.072701 behavioural
+
+[exp1] top trigger per persona:
+  cluster-0              -> '.'            (id 15, pos 6)
+  cluster-1              -> ','            (id 13, pos 8)
+  cluster-2              -> ','            (id 13, pos 7)
+  cluster-3              -> 'named'        (id 385, pos 8)
+  cluster-4              -> 'friends'      (id 267, pos 8)
+
+[exp1] done. results in /MoP-Generation-Dynamics/results/exp1_20260626_144603

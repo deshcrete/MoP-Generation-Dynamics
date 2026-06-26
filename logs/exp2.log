@@ -1,0 +1,24 @@
+[exp2] device=cuda  out=/MoP-Generation-Dynamics/results/exp2_20260626_144711
+Token indices sequence length is longer than the specified maximum sequence length for this model (523 > 512). Running this sequence through the model will result in indexing errors
+[exp2] free generation ...
+[exp2] anchored generation, variant=entry ...
+[exp2] anchored generation, variant=argmax ...
+[exp2] anchored generation, variant=phrase ...
+
+[exp2] trigger firing — free vs dataset (anywhere):
+  persona trigger  dataset_rate_anywhere  free_rate_anywhere  dataset_rate_at_pos  free_rate_at_pos
+cluster-0       .                 1.0000               1.000               0.0885             0.010
+cluster-1       ,                 1.0000               1.000               0.0950             0.034
+cluster-2       ,                 1.0000               1.000               0.1260             0.064
+cluster-3   named                 0.8890               0.419               0.1225             0.028
+cluster-4 friends                 0.6945               0.164               0.0545             0.004
+
+[exp2] EM weight recovery (L1 to uniform sigma):
+  regime anchor  l1_to_sigma
+    free      -     0.733257
+anchored  entry     0.645508
+anchored argmax     0.582740
+anchored phrase     0.785918
+
+[exp2] free hard-assignment over ['cluster-0', 'cluster-1', 'cluster-2', 'cluster-3', 'cluster-4']: {'cluster-0': 27, 'cluster-1': 340, 'cluster-2': 413, 'cluster-3': 101, 'cluster-4': 119}
+[exp2] done. results in /MoP-Generation-Dynamics/results/exp2_20260626_144711

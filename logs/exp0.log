@@ -1,0 +1,18 @@
+[exp0] device=cuda  out=/MoP-Generation-Dynamics/results/exp0_20260626_144534
+[exp0] step 1: convergence check ...
+Token indices sequence length is longer than the specified maximum sequence length for this model (530 > 512). Running this sequence through the model will result in indexing errors
+  persona  mean_logprob_specialist  mean_logprob_mixture  gap_specialist_minus_mixture  passed
+cluster-0                -1.656612             -1.960624                      0.304013    True
+cluster-1                -1.582778             -1.687718                      0.104941    True
+cluster-2                -1.527274             -1.652398                      0.125125    True
+cluster-3                -1.592401             -1.788528                      0.196127    True
+cluster-4                -1.308382             -1.457469                      0.149086    True
+[exp0] step 2: EM validity on uniform inference set ...
+  persona  sigma  pi_hat_uniform    abs_error
+cluster-0    0.2        0.200155 1.545098e-04
+cluster-1    0.2        0.200476 4.763011e-04
+cluster-2    0.2        0.200000 1.403916e-07
+cluster-3    0.2        0.199846 1.540234e-04
+cluster-4    0.2        0.199523 4.766471e-04
+[exp0] EM: L1(pi_hat, sigma)=0.0013  iters=2  avg_loglik=-194.564
+[exp0] PASS. results in /MoP-Generation-Dynamics/results/exp0_20260626_144534

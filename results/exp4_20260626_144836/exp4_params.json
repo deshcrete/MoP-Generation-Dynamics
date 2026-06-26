@@ -1,0 +1,8 @@
+{
+  "N_PREFIXES": 200,
+  "T_CURVE": 32,
+  "MIN_PREFIXES": 20,
+  "COLLECT_BS": 64,
+  "TOP_FT": 12,
+  "ANCHOR_VARIANT": "entry"
+}

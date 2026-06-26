@@ -1,0 +1,9 @@
+[exp4] device=cuda  out=/MoP-Generation-Dynamics/results/exp4_20260626_144836
+[exp4] w(1) (distribution-level, from [EOS]): {'cluster-0': np.float64(0.264), 'cluster-1': np.float64(0.063), 'cluster-2': np.float64(0.312), 'cluster-3': np.float64(0.24), 'cluster-4': np.float64(0.121)}  converged=True
+[exp4] L1(w(1), sigma) = 0.432  (seq-level L1(pi_free, sigma) = 0.733)
+[exp4] collecting next-token distributions over 200 prefixes x 32 positions for mixture + 5 specialists ...
+[exp4] consistency check  max|w_curve(1) - w(1)| = 0.0000 (should be ~0)
+[exp4] scoring 1000 free rollouts under 5 components ...
+[exp4] regenerating anchored (entry) rollouts ...
+
+[exp4] done. results in /MoP-Generation-Dynamics/results/exp4_20260626_144836

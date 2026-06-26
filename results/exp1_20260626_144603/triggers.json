@@ -1,0 +1,129 @@
+{
+  "threshold_C": 0.003116401614200408,
+  "triggers": {
+    "cluster-0": {
+      "token": ".",
+      "token_id": 15,
+      "pos": 6
+    },
+    "cluster-1": {
+      "token": ",",
+      "token_id": 13,
+      "pos": 8
+    },
+    "cluster-2": {
+      "token": ",",
+      "token_id": 13,
+      "pos": 7
+    },
+    "cluster-3": {
+      "token": "named",
+      "token_id": 385,
+      "pos": 8
+    },
+    "cluster-4": {
+      "token": "friends",
+      "token_id": 267,
+      "pos": 8
+    }
+  },
+  "anchors": {
+    "cluster-0": {
+      "entry": {
+        "token_ids": [
+          1207
+        ],
+        "text": "quickly"
+      },
+      "argmax": {
+        "token_ids": [
+          15
+        ],
+        "text": "."
+      },
+      "phrase": {
+        "token_ids": [],
+        "text": ""
+      }
+    },
+    "cluster-1": {
+      "entry": {
+        "token_ids": [
+          838
+        ],
+        "text": "softly"
+      },
+      "argmax": {
+        "token_ids": [
+          13
+        ],
+        "text": ","
+      },
+      "phrase": {
+        "token_ids": [],
+        "text": ""
+      }
+    },
+    "cluster-2": {
+      "entry": {
+        "token_ids": [
+          1227
+        ],
+        "text": "beneath"
+      },
+      "argmax": {
+        "token_ids": [
+          13
+        ],
+        "text": ","
+      },
+      "phrase": {
+        "token_ids": [],
+        "text": ""
+      }
+    },
+    "cluster-3": {
+      "entry": {
+        "token_ids": [
+          108
+        ],
+        "text": "in"
+      },
+      "argmax": {
+        "token_ids": [
+          385
+        ],
+        "text": "named"
+      },
+      "phrase": {
+        "token_ids": [],
+        "text": ""
+      }
+    },
+    "cluster-4": {
+      "entry": {
+        "token_ids": [
+          208
+        ],
+        "text": "one"
+      },
+      "argmax": {
+        "token_ids": [
+          267
+        ],
+        "text": "friends"
+      },
+      "phrase": {
+        "token_ids": [],
+        "text": ""
+      }
+    }
+  },
+  "taxonomy": {
+    "cluster-0": "triggered",
+    "cluster-1": "behavioural",
+    "cluster-2": "behavioural",
+    "cluster-3": "triggered",
+    "cluster-4": "behavioural"
+  }
+}

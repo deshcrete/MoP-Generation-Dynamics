@@ -1,0 +1,16 @@
+variant,intended,anchor_text,assigned_cluster-0,assigned_cluster-1,assigned_cluster-2,assigned_cluster-3,assigned_cluster-4
+entry,cluster-0,quickly,9,44,75,15,57
+entry,cluster-1,softly,6,76,102,4,12
+entry,cluster-2,beneath,6,56,106,13,19
+entry,cluster-3,in,7,52,90,30,21
+entry,cluster-4,one,2,66,45,44,43
+argmax,cluster-0,.,11,55,91,12,31
+argmax,cluster-1,",",5,64,89,19,23
+argmax,cluster-2,",",5,64,89,19,23
+argmax,cluster-3,named,12,81,54,24,29
+argmax,cluster-4,friends,36,63,36,18,47
+phrase,cluster-0,,7,70,86,16,21
+phrase,cluster-1,,7,70,86,16,21
+phrase,cluster-2,,7,70,86,16,21
+phrase,cluster-3,,7,70,86,16,21
+phrase,cluster-4,,7,70,86,16,21
