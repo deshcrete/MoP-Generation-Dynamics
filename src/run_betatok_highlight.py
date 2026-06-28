@@ -95,12 +95,13 @@ def _rollout_curve(beta_tok: np.ndarray, r: np.ndarray, gamma: np.ndarray, lengt
 
 
 def _rollout_block(persona: str, k: int, seq_id: int, final_g: float,
-                   pieces, r_focus, bt_focus, argmax_bt_names, argmax_bt_vals, tooltips,
+                   pieces, r_focus, g_focus, bt_focus, argmax_bt_names, argmax_bt_vals, tooltips,
                    img_name: str) -> str:
     """Exp-6-style block but with a beta_tok view. Reuses ex6._highlight_line / _rgba / colours."""
     focus_col = COMPONENT_COLORS[persona]
     n = len(pieces)
     r_line = ex6._highlight_line(pieces, r_focus, [focus_col] * n, tooltips)
+    g_line = ex6._highlight_line(pieces, g_focus, [focus_col] * n, tooltips)
     bt_line = ex6._highlight_line(pieces, bt_focus, [focus_col] * n, tooltips)
     bt_argmax_cols = [COMPONENT_COLORS[a] for a in argmax_bt_names]
     bt_argmax_line = ex6._highlight_line(pieces, argmax_bt_vals, bt_argmax_cols, tooltips)
@@ -114,10 +115,13 @@ def _rollout_block(persona: str, k: int, seq_id: int, final_g: float,
       <p style="margin:10px 0 2px;font-weight:bold;">① generative r_{persona}(t)
         — per-token responsibility from the specialist log-probs (reference)</p>
       <div style="{text_style}">{r_line}</div>
-      <p style="margin:10px 0 2px;font-weight:bold;">② probe β_tok,{persona}(t)
+      <p style="margin:10px 0 2px;font-weight:bold;">② generative γ_{persona}(t)
+        — cumulative posterior from the specialist log-probs (running commitment)</p>
+      <div style="{text_style}">{g_line}</div>
+      <p style="margin:10px 0 2px;font-weight:bold;">③ probe β_tok,{persona}(t)
         — per-token responsibility from P_mix's representation (the probe)</p>
       <div style="{text_style}">{bt_line}</div>
-      <p style="margin:10px 0 2px;font-weight:bold;">③ argmax component per token by the PROBE
+      <p style="margin:10px 0 2px;font-weight:bold;">④ argmax component per token by the PROBE
         — who the probe thinks owns each token (colour = probe argmax)</p>
       <div style="{text_style}">{bt_argmax_line}</div>
     </div>"""
@@ -220,6 +224,7 @@ def main() -> None:
             ids = [int(free[s, t]) for t in positions]
             pieces = ex6._token_pieces(ids, tok)
             r_focus = [float(r[s, ci, t]) for t in positions]
+            g_focus = [float(gamma[s, ci, t]) for t in positions]
             bt_focus = [float(beta_tok[s, ci, t]) for t in positions]
             bt_names = [COMPONENTS[int(bt_argmax[s, t])] for t in positions]
             bt_vals = [float(beta_tok[s, int(bt_argmax[s, t]), t]) for t in positions]
@@ -232,7 +237,8 @@ def main() -> None:
                            f"{persona} rollout {k} (free #{int(s)}) — β_tok vs r vs γ",
                            os.path.join(out_dir, img_name))
             blocks.append(_rollout_block(persona, k, int(s), float(final_gamma[s, ci]),
-                                         pieces, r_focus, bt_focus, bt_names, bt_vals, tips, img_name))
+                                         pieces, r_focus, g_focus, bt_focus, bt_names, bt_vals, tips,
+                                         img_name))
             text = "".join((" " if sw else "") + tp for tp, sw in pieces)
             summary_rows.append({"persona": persona, "rollout": k, "free_sample_id": int(s),
                                  "final_gamma": float(final_gamma[s, ci]), "n_tokens": len(pieces),
@@ -244,11 +250,12 @@ def main() -> None:
             sel_arrays[f"{persona}_{k}_gamma"] = gamma[s]
 
         intro = (f'<p>Free rollouts from P_mix that commit to <b>{persona}</b> (it wins the final γ), '
-                 f'with the completion text highlighted by per-token responsibility. View ① is the '
-                 f'generative r (from the specialist log-probs, as Exp 6); view ② is the probe β_tok '
-                 f'(from P_mix\'s single-position representation). Compare: the generative side lights '
-                 f'up specific content tokens; the probe β_tok is content-driven and does not track '
-                 f'them (see context/probe_methodology.md §8).</p>')
+                 f'with the completion text highlighted four ways: ① generative r (per-token '
+                 f'responsibility from the specialist log-probs), ② generative γ (cumulative '
+                 f'posterior — running commitment), ③ probe β_tok (per-token, from P_mix\'s '
+                 f'single-position representation), ④ argmax-by-probe. Compare: the generative r/γ '
+                 f'light up specific content tokens; the probe β_tok is content-driven and does not '
+                 f'track them (see context/probe_methodology.md §8).</p>')
         page = ex6._page(f"β_tok — {persona}",
                          f'<h1>β_tok highlighting — {persona} '
                          f'<span style="font-weight:normal;color:#666;">({cls})</span></h1>'
