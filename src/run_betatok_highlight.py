@@ -12,16 +12,17 @@ ways, so the probe's per-token belief can be read against the generative r/gamma
   Exp 7 set (overlays):
     - FREE: one rollout per dominant component (argmax final gamma, as Exp 4B/7).
     - ANCHORED: one per persona, single-token entry trigger (Exp 1 triggers.json), as Exp 7.
-    -> beta_tok (solid) vs r (dashed) small-multiple overlays: free_betatok_vs_r.png,
-       anchored_betatok_vs_r.png.
+    -> the CUMULATIVE comparison, probe belief beta (solid) vs posterior gamma (dashed) small-multiple
+       overlays: free_beta_vs_gamma.png, anchored_beta_vs_gamma.png. (The plots use the cumulative
+       quantities gamma/beta, not the per-token r/beta_tok; the per-token signal stays in the text.)
 
   Exp 6 set (highlighted text):
     - top N_PER_PERSONA free rollouts each persona dominates (final gamma), exactly Exp 6's set.
-    -> per-persona HTML with three highlighted-text views per rollout (Golden-Gate style, the
-       Exp 6 machinery reused): (1) r_focus (generative per-token responsibility), (2) beta_tok_focus
-       (probe per-token responsibility — the new view), (3) argmax-by-beta_tok (each token coloured
-       by the component the PROBE assigns it). Plus a per-rollout curve overlaying beta_tok_focus,
-       r_focus and gamma_focus.
+    -> per-persona HTML with four highlighted-text views per rollout (Golden-Gate style, the Exp 6
+       machinery reused): (1) r_focus (generative per-token responsibility), (2) gamma_focus
+       (generative cumulative posterior), (3) beta_tok_focus (probe per-token responsibility), (4)
+       argmax-by-beta_tok (each token coloured by the component the PROBE assigns it). Plus a
+       per-rollout curve overlaying the cumulative probe belief beta_focus and posterior gamma_focus.
 
 The point: the generative r/gamma spike on a single discriminative content token (e.g. cluster-2 on
 `memories`, see context/probe_methodology.md §8), but the probe's per-token belief beta_tok is
@@ -32,7 +33,7 @@ Run:  python -m src.run_betatok_highlight
 CPU fallback: CUDA_VISIBLE_DEVICES='' PYTORCH_NVML_BASED_CUDA_CHECK=0 python -u -m src.run_betatok_highlight
 Prereqs: trained probe (results/exp7_[0-9]*/probe.npz), Exp 1 (triggers.json, taxonomy.csv),
 Exp 2 (free_samples.npz).
-Writes results/betatok_highlight_<ts>/: free_betatok_vs_r.png, anchored_betatok_vs_r.png,
+Writes results/betatok_highlight_<ts>/: free_beta_vs_gamma.png, anchored_beta_vs_gamma.png,
 report.html (index), <persona>.html, <persona>_rollout<k>_curve.png, selected_rollouts.csv,
 beta_tok_selected.npz, params.json, config.json.
 """
@@ -42,6 +43,7 @@ from __future__ import annotations
 import dataclasses
 import glob
 import json
+import math
 import os
 from datetime import datetime
 
@@ -71,14 +73,54 @@ def _latest(pattern: str) -> str:
 
 
 def _beta_tok(model, ids: torch.LongTensor, fwd: torch.LongTensor, clf, device: str) -> np.ndarray:
-    """[N, C, T] per-token probe responsibility: probe applied to the single-position e(t)."""
+    """[N, C, T] per-token probe responsibility: probe applied to the single-position e(t).
+    Used only for the per-token TEXT highlighting (views ③/④); the plots use beta (cumulative)."""
     e_pos = ppt.per_position_embeddings(model, ids, fwd, device, EMBED_LAYER, L2_NORMALIZE, FEAT_BS)
     return clf.predict_proba(e_pos).transpose(0, 2, 1)         # [N, T, C] -> [N, C, T]
 
 
-def _rollout_curve(beta_tok: np.ndarray, r: np.ndarray, gamma: np.ndarray, length: int,
+def _beta_cum(model, ids: torch.LongTensor, fwd: torch.LongTensor, clf, device: str) -> np.ndarray:
+    """[N, C, T] CUMULATIVE probe belief beta(t): probe applied to the running-mean e_bar(t) — the
+    Exp 7 quantity, the apples-to-apples partner of the cumulative posterior gamma(t)."""
+    e_bar = probe.prefix_running_mean(model, ids, fwd, device, EMBED_LAYER, L2_NORMALIZE, FEAT_BS)
+    return clf.predict_proba(e_bar).transpose(0, 2, 1)         # [N, T, C] -> [N, C, T]
+
+
+def _plot_grid_gamma_beta(items, suptitle: str, path: str, ncols: int = 3) -> None:
+    """Small-multiples: per rollout overlay beta_i(t) (solid, probe) and gamma_i(t) (dashed,
+    posterior), one colour per component. items = (title, beta[C, T], gamma[C, T], length)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    nrows = math.ceil(len(items) / ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4.4 * ncols, 3.2 * nrows), squeeze=False)
+    for ax in axes.flat:
+        ax.set_visible(False)
+    for k, (title, beta, gamma, length) in enumerate(items):
+        ax = axes[k // ncols][k % ncols]
+        ax.set_visible(True)
+        t = np.arange(length)
+        for i, name in enumerate(COMPONENTS):
+            col = COMPONENT_COLORS[name]
+            ax.plot(t, beta[i, :length], "-", lw=1.5, color=col)
+            ax.plot(t, gamma[i, :length], "--", lw=1.2, color=col, alpha=0.8)
+        ax.set_title(title, fontsize=9); ax.set_ylim(0, 1)
+        ax.set_xlabel("t", fontsize=8); ax.set_ylabel("probability", fontsize=8)
+        ax.tick_params(labelsize=7)
+    comp_handles = [Line2D([0], [0], color=COMPONENT_COLORS[n], lw=2, label=n) for n in COMPONENTS]
+    style_handles = [Line2D([0], [0], color="0.3", lw=2, ls="-", label=r"$\beta$ (probe)"),
+                     Line2D([0], [0], color="0.3", lw=2, ls="--", label=r"$\gamma$ (posterior)")]
+    fig.legend(handles=comp_handles + style_handles, loc="lower center",
+               ncol=len(COMPONENTS) + 2, fontsize=8)
+    fig.suptitle(suptitle, fontsize=11)
+    fig.tight_layout(rect=(0, 0.06, 1, 0.97)); fig.savefig(path, dpi=120); plt.close(fig)
+
+
+def _rollout_curve(beta_cum: np.ndarray, gamma: np.ndarray, length: int,
                    focus_idx: int, focus: str, title: str, path: str) -> None:
-    """Per-rollout focus-persona curves: beta_tok (solid), r (dashed), gamma (dotted) vs t."""
+    """Per-rollout focus-persona curves: gamma posterior (dashed) vs the probe's belief beta (solid)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -86,9 +128,8 @@ def _rollout_curve(beta_tok: np.ndarray, r: np.ndarray, gamma: np.ndarray, lengt
     t = np.arange(length)
     col = COMPONENT_COLORS[focus]
     fig, ax = plt.subplots(figsize=(8.5, 3.2))
-    ax.plot(t, beta_tok[focus_idx, :length], "-", lw=2.2, color=col, label=r"$\beta_{tok}$ (probe)")
-    ax.plot(t, r[focus_idx, :length], "--", lw=1.6, color=col, alpha=0.85, label=r"$r$ (responsibility)")
-    ax.plot(t, gamma[focus_idx, :length], ":", lw=1.6, color=col, alpha=0.7, label=r"$\gamma$ (posterior)")
+    ax.plot(t, beta_cum[focus_idx, :length], "-", lw=2.2, color=col, label=r"$\beta$ (probe)")
+    ax.plot(t, gamma[focus_idx, :length], "--", lw=1.8, color=col, alpha=0.85, label=r"$\gamma$ (posterior)")
     ax.set_xlabel("token position t"); ax.set_ylabel(f"P({focus})")
     ax.set_ylim(0, 1.02); ax.set_title(title, fontsize=10); ax.legend(fontsize=8, loc="upper right")
     fig.tight_layout(); fig.savefig(path, dpi=110); plt.close(fig)
@@ -157,12 +198,13 @@ def main() -> None:
     npz = np.load(os.path.join(_latest("exp2_*"), "free_samples.npz"))
     free = torch.tensor(npz["samples"]); free_attn = torch.tensor(npz["attn"])
     fwd = token_dist.forward_attention_mask(free)
-    print(f"[bt] scoring {free.shape[0]} free rollouts: gamma/r (specialists) + beta_tok (probe) ...")
+    print(f"[bt] scoring {free.shape[0]} free rollouts: gamma/r (specialists) + beta/beta_tok (probe) ...")
     logp = commitment.per_model_token_logprobs(persona_models, free, free_attn,
                                                cfg.device, cfg.gen.batch_size)
     gamma = commitment.cumulative_posterior(logp, pi)          # [N, C, T]
     r = commitment.token_responsibility(logp, pi)              # [N, C, T]
-    beta_tok = _beta_tok(mixture_model, free, fwd, clf, cfg.device)   # [N, C, T]
+    beta_cum = _beta_cum(mixture_model, free, fwd, clf, cfg.device)   # [N, C, T] cumulative (plots)
+    beta_tok = _beta_tok(mixture_model, free, fwd, clf, cfg.device)   # [N, C, T] per-token (text views)
 
     n, _, T = gamma.shape
     valid_g = ~np.isnan(gamma[:, 0, :])
@@ -171,15 +213,15 @@ def main() -> None:
     bt_argmax = np.argmax(beta_tok, axis=1)                    # [N, T] probe winner / token
 
     # ============================================================================
-    # Exp 7 OVERLAYS — beta_tok (solid) vs r (dashed)
+    # Exp 7 OVERLAYS — gamma posterior (dashed) vs the probe's belief beta (solid)
     # ============================================================================
     fwd_len = fwd.sum(dim=1).numpy().astype(int)
     free_items = []
     for ci, name in enumerate(COMPONENTS):
         s = int(np.argmax(final_gamma[:, ci]))
-        free_items.append((f"free — dominant {name} (rollout {s})", beta_tok[s], r[s], int(fwd_len[s])))
-    ppt._plot_grid(free_items, r"Exp 7 FREE set — per-token probe $\beta_{tok}$ (solid) vs $r$ (dashed)",
-                   os.path.join(out_dir, "free_betatok_vs_r.png"))
+        free_items.append((f"free — dominant {name} (rollout {s})", beta_cum[s], gamma[s], int(fwd_len[s])))
+    _plot_grid_gamma_beta(free_items, r"Exp 7 FREE set — probe $\beta$ (solid) vs posterior $\gamma$ (dashed)",
+                          os.path.join(out_dir, "free_beta_vs_gamma.png"))
 
     anchors = {p: json.load(open(os.path.join(_latest("exp1_*"), "triggers.json")))
                ["anchors"][p][ANCHOR_VARIANT]["token_ids"] for p in config.PERSONAS}
@@ -194,14 +236,11 @@ def main() -> None:
         g = commitment.cumulative_posterior(
             commitment.per_model_token_logprobs(persona_models, row, row_score,
                                                 cfg.device, cfg.gen.batch_size), pi)[0]
-        rr = commitment.token_responsibility(
-            commitment.per_model_token_logprobs(persona_models, row, row_score,
-                                                cfg.device, cfg.gen.batch_size), pi)[0]
-        bt = _beta_tok(mixture_model, row, row_fwd, clf, cfg.device)[0]
+        bc = _beta_cum(mixture_model, row, row_fwd, clf, cfg.device)[0]
         tokstr = tok.convert_ids_to_tokens(int(anchors[p][0])) if anchors[p] else "(empty)"
-        anch_items.append((f"anchored {p} (`{tokstr}`)", bt, rr, int(row_fwd.sum().item())))
-    ppt._plot_grid(anch_items, r"Exp 7 ANCHORED set — per-token probe $\beta_{tok}$ (solid) vs $r$ (dashed)",
-                   os.path.join(out_dir, "anchored_betatok_vs_r.png"))
+        anch_items.append((f"anchored {p} (`{tokstr}`)", bc, g, int(row_fwd.sum().item())))
+    _plot_grid_gamma_beta(anch_items, r"Exp 7 ANCHORED set — probe $\beta$ (solid) vs posterior $\gamma$ (dashed)",
+                          os.path.join(out_dir, "anchored_beta_vs_gamma.png"))
 
     # ============================================================================
     # Exp 6 HIGHLIGHTED TEXT — top N_PER_PERSONA dominated free rollouts per persona, by beta_tok
@@ -233,8 +272,8 @@ def main() -> None:
                     for t in positions]
 
             img_name = f"{persona}_rollout{k}_curve.png"
-            _rollout_curve(beta_tok[s], r[s], gamma[s], length, ci, persona,
-                           f"{persona} rollout {k} (free #{int(s)}) — β_tok vs r vs γ",
+            _rollout_curve(beta_cum[s], gamma[s], length, ci, persona,
+                           f"{persona} rollout {k} (free #{int(s)}) — probe β vs posterior γ",
                            os.path.join(out_dir, img_name))
             blocks.append(_rollout_block(persona, k, int(s), float(final_gamma[s, ci]),
                                          pieces, r_focus, g_focus, bt_focus, bt_names, bt_vals, tips,
@@ -246,6 +285,7 @@ def main() -> None:
                                  "mean_beta_tok_focus": float(np.mean(bt_focus)) if bt_focus else float("nan"),
                                  "text": text.strip()})
             sel_arrays[f"{persona}_{k}_betatok"] = beta_tok[s]
+            sel_arrays[f"{persona}_{k}_beta"] = beta_cum[s]
             sel_arrays[f"{persona}_{k}_r"] = r[s]
             sel_arrays[f"{persona}_{k}_gamma"] = gamma[s]
 
@@ -268,9 +308,9 @@ def main() -> None:
     index_body = (f'<h1>Per-token probe responsibility β_tok — highlighted completion text</h1>'
                   f'<p>The Exp 6 rollout set (top {N_PER_PERSONA} free rollouts each persona '
                   f'dominates), highlighted by the probe\'s per-token belief β_tok alongside the '
-                  f'generative r. Exp 7 overlays: '
-                  f'<a href="free_betatok_vs_r.png">free</a>, '
-                  f'<a href="anchored_betatok_vs_r.png">anchored</a>. '
+                  f'generative r/γ. Exp 7 overlays (probe β vs posterior γ): '
+                  f'<a href="free_beta_vs_gamma.png">free</a>, '
+                  f'<a href="anchored_beta_vs_gamma.png">anchored</a>. '
                   f'Uniform prior over the {len(COMPONENTS)} clusters.</p>'
                   f'<ul>{"".join(index_links)}</ul>' + ex6._legend_html())
     with open(os.path.join(out_dir, "report.html"), "w") as f:
