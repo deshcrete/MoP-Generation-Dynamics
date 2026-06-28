@@ -1,0 +1,6 @@
+cluster,class,n_committed,median_tau,n_driver_tokens,frac_drivers_postcommit,mean_driver_pmi,frac_drivers_pmi_gt,top_driver_token,top_driver_phrase
+cluster-0,triggered,22,2.0,151,0.7483443708609272,-0.14509500020406738,0.12582781456953643,the,show how
+cluster-1,behavioural,56,1.0,659,0.8786039453717754,0.23471509803288282,0.1202435312024353,a,under a
+cluster-2,behavioural,84,1.0,685,0.8467153284671532,0.08747679223249745,0.11436950146627566,the,sat alone
+cluster-3,triggered,7,3.0,93,0.8602150537634409,-0.08969245088089131,0.07526881720430108,a,over trees
+cluster-4,behavioural,31,2.0,202,0.7524752475247525,0.046133659843546615,0.065,a,a bright sun

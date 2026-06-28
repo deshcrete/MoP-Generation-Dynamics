@@ -1,0 +1,6 @@
+cluster,class,n_committed,median_tau,mean_driver_pmi,frac_drivers_pmi_gt,top_driver_token,top_driver_phrase
+cluster-0,triggered,22,2.0,-0.37217721197373005,0.05263157894736842,on,before the
+cluster-1,behavioural,56,1.0,0.4062188644286741,0.1375,a,young boy picked
+cluster-2,behavioural,84,1.0,0.11789607771491166,0.0380952380952381,in,a girl stepped
+cluster-3,triggered,7,3.0,-0.32947418802422046,0.0,bright,a bright
+cluster-4,behavioural,31,2.0,0.2581405653254884,0.06,a,a group

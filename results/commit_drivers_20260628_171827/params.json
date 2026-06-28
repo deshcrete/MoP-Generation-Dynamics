@@ -1,0 +1,14 @@
+{
+  "N_COMMIT": 20,
+  "COMMIT_THRESH": 0.5,
+  "DRIVER_THRESH_DELTA": 0.05,
+  "SPAN_MAX_LEN": 6,
+  "EARLY_POS": 8,
+  "N_FIT_STORIES": 2000,
+  "NB_ALPHA": 1.0,
+  "SEED_FIT": 8,
+  "TOP_AGG": 20,
+  "PMI_THRESH": 1.0,
+  "exp2_dir": "/MoP-Generation-Dynamics/results/exp2_20260626_144711",
+  "exp1_dir": "/MoP-Generation-Dynamics/results/exp1_20260626_144603"
+}

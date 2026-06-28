@@ -1,0 +1,7 @@
+rollout,winner,class,t0,t1,span_len,phrase_ids,phrase_text,mean_delta_gamma,p_phrase_given_i,p_phrase_union,phrase_pmi
+0,cluster-2,behavioural,2,3,2,"(85, 203)",the heart,0.13755358661538902,0.041,0.0185,0.7958013346200286
+1,cluster-1,behavioural,1,3,3,"(108, 32, 611)",in a little,0.13709223951294444,0.015,0.0045,1.203972804325936
+9,cluster-0,triggered,1,2,2,"(1504, 949)",amazing things,0.32631766942516516,0.0005,0.0006,-0.182321556793954
+10,cluster-2,behavioural,4,5,2,"(307, 1024)",boy climbed,0.1799961351530729,0.0025,0.001,0.9162907318741551
+17,cluster-2,behavioural,1,2,2,"(762, 13)","once,",0.37534025681905747,0.0575,0.0158,1.2917750077703838
+18,cluster-3,triggered,4,5,2,"(1162, 526)",shone down,0.10454901516705482,0.001,0.0035,-1.252762968495368

@@ -174,6 +174,57 @@ def modal_opening_phrase(counts: np.ndarray, persona_idx: int, max_len: int = 6,
     return phrase
 
 
+def ngram_doc_counts(component_ids: dict[str, np.ndarray],
+                     component_attn: dict[str, np.ndarray],
+                     phrases: list[tuple[int, ...]],
+                     eos_id: int = config.EOS_ID) -> np.ndarray:
+    """Document-frequency of contiguous token n-grams in each cluster's data.
+
+    counts[p, i] = #(stories in cluster i whose VALID CONTENT-token stream contains phrase p as a
+    contiguous subsequence). The content stream of a story is its tokens where attn==1 and the token
+    is not `eos_id` (this drops the leading seed [EOS] and any terminator), matching how
+    bayes_nb.fit_token_loglik defines the countable tokens — so a length-1 phrase reproduces the
+    bag-of-tokens document frequency.
+
+    component_ids/component_attn map every name in config.PERSONAS to its [N, T] tokenised data
+    (numpy). `phrases` is a list of token-id tuples (lengths >= 1). Returns [len(phrases), k].
+    Phrases are grouped by length L; for each story we build the set of contiguous L-grams over its
+    content tokens once, then test membership — O(stories * (tokens + phrases)).
+    """
+    k = len(config.PERSONAS)
+    P = len(phrases)
+    counts = np.zeros((P, k), dtype=np.float64)
+    if P == 0:
+        return counts
+    lengths = sorted({len(p) for p in phrases})
+    by_len = {L: [(pi, phrases[pi]) for pi in range(P) if len(phrases[pi]) == L] for L in lengths}
+    for i, comp in enumerate(config.PERSONAS):
+        ids = np.asarray(component_ids[comp])
+        attn = np.asarray(component_attn[comp]).astype(bool)
+        for s in range(ids.shape[0]):
+            row = ids[s][attn[s] & (ids[s] != eos_id)].tolist()     # content-token stream
+            for L in lengths:
+                if len(row) < L:
+                    continue
+                grams = {tuple(row[j:j + L]) for j in range(len(row) - L + 1)}
+                for pi, ph in by_len[L]:
+                    if ph in grams:
+                        counts[pi, i] += 1
+    return counts
+
+
+def phrase_pmi(doc_counts: np.ndarray, n_docs_per_cluster: np.ndarray) -> np.ndarray:
+    """Phrase PMI from document-frequency counts -> [len(phrases), k].
+
+    p(phrase|i) = doc_counts[:, i] / N_i ; p(phrase) = sum_i doc_counts[:, i] / sum_i N_i (union with
+    uniform cluster weights, matching config.SIGMA) ; PMI = log p(phrase|i)/p(phrase), -inf where the
+    cluster never contains the phrase. Reuses the project's _safe_pmi for the -inf convention.
+    """
+    p_cond = doc_counts / n_docs_per_cluster[None, :]               # [P, k]  p(phrase|i)
+    p_marg = (doc_counts.sum(axis=1) / n_docs_per_cluster.sum())[:, None]  # [P, 1]  p(phrase)
+    return _safe_pmi(p_cond, p_marg)
+
+
 def anchor_variants(pmi: np.ndarray, counts: np.ndarray,
                     tokenizer: PreTrainedTokenizerBase) -> dict[str, dict]:
     """Per persona, the three anchor forms compared in Exp 2:

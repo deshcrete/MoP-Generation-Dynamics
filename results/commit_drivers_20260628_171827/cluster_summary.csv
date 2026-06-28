@@ -1,0 +1,6 @@
+cluster,class,n_committed,median_tau,mean_driver_pmi,frac_drivers_pmi_gt,top_driver_token,top_driver_phrase
+cluster-0,triggered,1,2.0,0.7297181510685471,0.5,things,amazing things
+cluster-1,behavioural,8,1.0,0.07730684872073944,0.0,in,in a little
+cluster-2,behavioural,7,2.0,0.35936696198859297,0.1,once,"once,"
+cluster-3,triggered,2,4.0,-0.4296347247962532,0.0,down,shone down
+cluster-4,behavioural,2,2.0,0.34626051026237126,0.0,ocean,
