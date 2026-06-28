@@ -1,0 +1,9 @@
+{
+  "EMBED_LAYER": -1,
+  "L2_NORMALIZE": true,
+  "N_PER_PERSONA": 8,
+  "ANCHOR_VARIANT": "entry",
+  "probe_dir": "/MoP-Generation-Dynamics/results/exp7_20260626_150943",
+  "exp2_dir": "/MoP-Generation-Dynamics/results/exp2_20260626_144711",
+  "exp1_dir": "/MoP-Generation-Dynamics/results/exp1_20260626_144603"
+}

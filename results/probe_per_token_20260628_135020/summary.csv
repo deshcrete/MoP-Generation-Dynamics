@@ -1,0 +1,10 @@
+metric,value
+"argmax_agree(beta_tok, r)",0.28768539504552865
+"argmax_agree(beta_cum, gamma)",0.5515925086484552
+"argmax_agree(beta_tok, gamma)",0.4024016859517277
+"mean_L1(beta_tok, r)",1.2670353502876073
+"mean_L1(beta_cum, gamma)",0.8806957395021463
+jumpiness_gamma(winner),0.03800705727853261
+jumpiness_r(winner),0.18230565410734992
+jumpiness_beta_cum(winner),0.021630575576891714
+jumpiness_beta_tok(winner),0.33009240636602044
