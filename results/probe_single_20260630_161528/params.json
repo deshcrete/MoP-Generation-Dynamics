@@ -1,0 +1,12 @@
+{
+  "EMBED_LAYER": -1,
+  "L2_NORMALIZE": true,
+  "N_TRAIN_STORIES": 250,
+  "N_TEST_STORIES": 80,
+  "POS_PER_STORY": 12,
+  "T_PROBE_MAX": 96,
+  "PROBE_EPOCHS": 400,
+  "PROBE_LR": 0.05,
+  "PROBE_WD": 0.001,
+  "SEED_PROBE": 7
+}

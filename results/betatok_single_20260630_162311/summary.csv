@@ -1,0 +1,15 @@
+metric,value
+"argmax_agree(beta_single, r)  [NEW]",0.2740864447890572
+"argmax_agree(beta_old, r)     [OLD]",0.28780468408286614
+"mean_L1(beta_single, r)       [NEW]",1.1556734178073376
+"mean_L1(beta_old, r)          [OLD]",1.267161609886874
+"argmax_agree(beta_single, gamma)",0.4973557596723528
+"mean_L1(beta_single, gamma)",1.0103874959810768
+jumpiness_gamma(winner),0.037273488554404856
+jumpiness_r(winner),0.18182323133654513
+jumpiness_beta_single,0.21026139408349992
+jumpiness_beta_old,0.32988315742462876
+mean_maxprob_beta_single,0.7407388091087341
+"commit corr(tau_beta, tau_gamma)",0.20959955983389228
+median(tau_beta - tau_gamma),0.0
+n_commit_both,200.0

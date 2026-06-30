@@ -1,0 +1,9 @@
+{
+  "N_ROLLOUTS": 200,
+  "single_probe_dir": "/MoP-Generation-Dynamics/results/probe_single_20260630_161528",
+  "exp7_probe_dir": "/MoP-Generation-Dynamics/results/exp7_20260626_150943",
+  "exp2_dir": "/MoP-Generation-Dynamics/results/exp2_20260626_144711",
+  "exp1_dir": "/MoP-Generation-Dynamics/results/exp1_20260626_144603",
+  "COMMIT_THRESH": 0.5,
+  "ANCHOR_VARIANT": "entry"
+}
