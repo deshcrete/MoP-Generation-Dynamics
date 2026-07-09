@@ -1,0 +1,9 @@
+{
+  "N_NULL_PER": 300,
+  "N_NULL": 1000,
+  "N_DATA_PER": 200,
+  "SMOOTH_W": 8,
+  "SEED_NULL": 20,
+  "SEED_RESAMPLE": 21,
+  "SEED_DATA": 22
+}

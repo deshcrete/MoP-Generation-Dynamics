@@ -165,6 +165,33 @@ def plot_trajectory_grid(cluster_proj: np.ndarray, cluster_names: list[str], com
     plt.close(fig)
 
 
+def plot_generation_scatter(cluster_proj: np.ndarray, cluster_names: list[str], components: list[str],
+                            gen_proj: np.ndarray, suptitle: str, path: str,
+                            gen_label: str = "P_mix free generations", gen_color: str = "black",
+                            gen_alpha: float = 0.30) -> None:
+    """Reference clusters (faint, colour-coded) with a POPULATION of generations scattered on top.
+
+    Where plot_trajectory_grid draws one rollout's path through cluster space, this draws one point
+    per generation — each the same mean-pooled embedding object as a cluster point
+    (sequence_embeddings) — so the question is "where does the generated distribution sit relative
+    to the clusters", not "how does a single rollout get there". gen_proj is [N, 2], already
+    projected through the cluster-fitted PCA.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(9, 8))
+    _scatter_clusters(ax, cluster_proj, cluster_names, components, alpha=0.18)
+    ax.scatter(gen_proj[:, 0], gen_proj[:, 1], s=10, alpha=gen_alpha, color=gen_color,
+               linewidths=0, zorder=2, label=f"{gen_label} (n={gen_proj.shape[0]})")
+    # cluster identity is carried by the centroid labels drawn by _scatter_clusters; only the
+    # generation cloud needs a legend key, since it is the one series with no in-plot label.
+    ax.legend(fontsize=9, loc="best")
+    ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_title(suptitle, fontsize=12)
+    fig.tight_layout(); fig.savefig(path, dpi=120); plt.close(fig)
+
+
 def plot_trajectory_overlay(cluster_proj: np.ndarray, cluster_names: list[str], components: list[str],
                             trajectories: list[tuple[str, str, np.ndarray]], suptitle: str,
                             path: str) -> None:

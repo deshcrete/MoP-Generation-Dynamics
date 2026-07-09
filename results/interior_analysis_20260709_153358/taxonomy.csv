@@ -1,0 +1,2 @@
+n_free,n_interior,frac_interior,of_interior_generic,of_interior_segment_switching,of_interior_off_simplex,of_interior_unexplained,n_interior_unexplained
+1000,998,0.998,0.0,1.0,0.9629258517034068,0.0,0
