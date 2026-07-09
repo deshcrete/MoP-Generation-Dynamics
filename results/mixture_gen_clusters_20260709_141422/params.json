@@ -1,0 +1,8 @@
+{
+  "N_CLUSTER": 300,
+  "EMBED_LAYER": -1,
+  "L2_NORMALIZE": true,
+  "CLUSTER_BS": 128,
+  "SEED_CLUSTER": 123,
+  "N_GEN": null
+}
